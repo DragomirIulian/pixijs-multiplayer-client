@@ -1,0 +1,22 @@
+{
+  "name": "pixijs-multiplayer-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for PixiJS multiplayer client",
+  "main": "server.js",
+  "scripts": {
+    "start": "node test-server.js",
+    "dev": "nodemon test-server.js"
+  },
+  "keywords": ["pixijs", "multiplayer", "websocket", "game-server"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
