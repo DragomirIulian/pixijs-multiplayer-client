@@ -7,6 +7,7 @@ class Game {
         this.app = null;
         this.characters = new Map(); // Store all characters by ID
         this.energyOrbs = new Map(); // Store energy orbs from server
+        this.activeSpells = new Map(); // Store active spell effects
         this.gameMap = null;
         this.socket = null;
         this.characterCard = null;
@@ -19,8 +20,8 @@ class Game {
 
         // Initialize the application
         await this.app.init({ 
-            width: 1600,
-            height: 1200,
+            width: 1500,
+            height: 900,
             background: '#2c3e50',
             antialias: true
         });
@@ -70,10 +71,13 @@ class Game {
                 this.spawnCharacter(data.character);
                 break;
             case 'character_remove':
-                this.removeCharacter(data.characterId);
+                // Don't immediately remove if it might be part of a spell death
+                setTimeout(() => {
+                    this.removeCharacter(data.characterId);
+                }, 100); // Small delay to allow death animation to start
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs);
+                this.updateWorldState(data.characters, data.energyOrbs, data.tileMap, data.activeSpells);
                 break;
             case 'orb_spawned':
                 this.spawnEnergyOrb(data.orb);
@@ -83,6 +87,15 @@ class Game {
                 break;
             case 'attack':
                 this.handleAttack(data.attackerId, data.targetId, data.attackerPos, data.targetPos);
+                break;
+            case 'spell_started':
+                this.handleSpellStarted(data.spell);
+                break;
+            case 'spell_completed':
+                this.handleSpellCompleted(data);
+                break;
+            case 'tile_updated':
+                this.handleTileUpdated(data);
                 break;
         }
     }
@@ -111,13 +124,14 @@ class Game {
 
     removeCharacter(characterId) {
         const character = this.characters.get(characterId);
-        if (character) {
+        if (character && !character.isBeingRemoved) {
+            character.isBeingRemoved = true; // Prevent double removal
             this.app.stage.removeChild(character.sprite);
             this.characters.delete(characterId);
         }
     }
 
-    updateWorldState(charactersData, energyOrbsData) {
+    updateWorldState(charactersData, energyOrbsData, tileMapData, activeSpellsData) {
         // Remove characters that are no longer in the server state
         const serverCharacterIds = new Set(charactersData.map(char => char.id));
         
@@ -145,6 +159,18 @@ class Game {
             // Add new orbs from server
             energyOrbsData.forEach(orbData => {
                 this.spawnEnergyOrb(orbData);
+            });
+        }
+
+        // Update tile map from server state
+        if (tileMapData && this.gameMap) {
+            this.gameMap.updateTileMap(tileMapData);
+        }
+
+        // Restore active spells
+        if (activeSpellsData) {
+            activeSpellsData.forEach(spellData => {
+                this.handleSpellStarted(spellData);
             });
         }
     }
@@ -394,6 +420,98 @@ class Game {
         animate();
     }
 
+    createTileTransformationEffect(spellData) {
+        if (!this.gameMap || !this.gameMap.tileMap) return;
+        
+        const tileMap = this.gameMap.tileMap;
+        const targetTile = tileMap.tiles[spellData.targetTileY][spellData.targetTileX];
+        
+        // Calculate tile world position
+        const tileWorldX = targetTile.worldX;
+        const tileWorldY = targetTile.worldY;
+        const tileWidth = tileMap.tileWidth;
+        const tileHeight = tileMap.tileHeight;
+        
+        // Create transformation effect container
+        const transformEffect = new Graphics();
+        transformEffect.spellId = spellData.id;
+        transformEffect.startTime = Date.now();
+        transformEffect.duration = spellData.duration;
+        transformEffect.casterType = spellData.casterType;
+        transformEffect.tileX = tileWorldX;
+        transformEffect.tileY = tileWorldY;
+        transformEffect.tileWidth = tileWidth;
+        transformEffect.tileHeight = tileHeight;
+        
+        // Store the effect for updates
+        if (!this.tileTransformEffects) {
+            this.tileTransformEffects = new Map();
+        }
+        this.tileTransformEffects.set(spellData.id, transformEffect);
+        this.app.stage.addChild(transformEffect);
+    }
+
+    handleSpellStarted(spellData) {
+        // Create tether animation between caster and target tile
+        const tether = new Graphics();
+        
+        // Store spell data for updates
+        tether.spellData = spellData;
+        tether.startTime = Date.now();
+        
+        this.activeSpells.set(spellData.id, tether);
+        this.app.stage.addChild(tether);
+        
+        // Create tile transformation effect
+        if (spellData.targetTileX !== undefined && spellData.targetTileY !== undefined) {
+            this.createTileTransformationEffect(spellData);
+        }
+    }
+
+    handleSpellCompleted(data) {
+        // Remove the tether animation
+        const tether = this.activeSpells.get(data.spellId);
+        if (tether) {
+            this.app.stage.removeChild(tether);
+            this.activeSpells.delete(data.spellId);
+        }
+        
+        // Remove the tile transformation effect
+        if (this.tileTransformEffects) {
+            const transformEffect = this.tileTransformEffects.get(data.spellId);
+            if (transformEffect) {
+                this.app.stage.removeChild(transformEffect);
+                this.tileTransformEffects.delete(data.spellId);
+            }
+        }
+        
+        // Create death animation for the killed caster
+        const dyingCharacter = this.characters.get(data.killedCasterId);
+        if (dyingCharacter) {
+            console.log('Creating death animation for:', data.killedCasterId);
+            dyingCharacter.isBeingRemoved = true; // Prevent other removal attempts
+            this.createDeathAnimation(dyingCharacter);
+            
+            // Remove the killed caster after death animation completes
+            setTimeout(() => {
+                this.removeCharacter(data.killedCasterId);
+            }, 3100); // 2.1 seconds to ensure animation completes
+        } else {
+            console.log('No character found for death animation:', data.killedCasterId);
+        }
+    }
+
+    handleTileUpdated(data) {
+        // Update tile in the game map
+        if (this.gameMap && this.gameMap.tileMap) {
+            const tile = this.gameMap.tileMap.tiles[data.tileY][data.tileX];
+            tile.type = data.newType;
+            
+            // Update the visual tile
+            this.gameMap.updateSingleTile(data.tileX, data.tileY, data.newType);
+        }
+    }
+
     async setupMap() {
         this.gameMap = new GameMap(this.app);
         await this.gameMap.createMap();
@@ -454,6 +572,131 @@ class Game {
         if (this.characterCard) {
             this.characterCard.update();
         }
+
+        // Update spell tethers
+        this.activeSpells.forEach(tether => {
+            this.updateSpellTether(tether, time);
+        });
+
+        // Update tile transformation effects
+        if (this.tileTransformEffects) {
+            this.tileTransformEffects.forEach(effect => {
+                this.updateTileTransformEffect(effect, time);
+            });
+        }
+    }
+
+    updateSpellTether(tether, time) {
+        const spellData = tether.spellData;
+        const elapsed = Date.now() - tether.startTime;
+        const progress = elapsed / spellData.duration;
+        
+        // Clear and redraw tether
+        tether.clear();
+        
+        // Animated tether color based on caster type
+        const color = spellData.casterType === 'dark-soul' ? 0x8B0000 : 0xFFD700; // Dark red or gold
+        const alpha = 0.7 + Math.sin(elapsed * 0.01) * 0.3; // Pulsing effect
+        
+        // Draw animated line with energy particles
+        tether.lineStyle(3, color, alpha);
+        tether.moveTo(spellData.casterX, spellData.casterY);
+        tether.lineTo(spellData.targetX, spellData.targetY);
+        
+        // Add glowing particles along the line
+        const particleCount = 5;
+        for (let i = 0; i < particleCount; i++) {
+            const t = (i / particleCount + elapsed * 0.002) % 1;
+            const particleX = spellData.casterX + (spellData.targetX - spellData.casterX) * t;
+            const particleY = spellData.casterY + (spellData.targetY - spellData.casterY) * t;
+            
+            tether.beginFill(color, alpha);
+            tether.drawCircle(particleX, particleY, 3);
+            tether.endFill();
+        }
+        
+        // Progress indicator at target
+        const progressRadius = 15 * (1 + progress);
+        tether.lineStyle(2, color, 0.5);
+        tether.drawCircle(spellData.targetX, spellData.targetY, progressRadius);
+    }
+
+    updateTileTransformEffect(effect, time) {
+        const elapsed = Date.now() - effect.startTime;
+        const progress = elapsed / effect.duration;
+        
+        // Clear and redraw transformation effect
+        effect.clear();
+        
+        if (progress >= 1) return; // Effect completed
+        
+        // Create pulsing/crackling effect on the tile
+        const targetColor = effect.casterType === 'dark-soul' ? 0x555555 : 0x88FF88; // Gray or green
+        const baseAlpha = 0.3 + Math.sin(elapsed * 0.01) * 0.2; // Pulsing alpha
+        
+        // Draw transformation glow overlay on tile
+        effect.beginFill(targetColor, baseAlpha);
+        effect.drawRect(effect.tileX, effect.tileY, effect.tileWidth, effect.tileHeight);
+        effect.endFill();
+        
+        // Add crackling energy lines
+        const numLines = 5;
+        for (let i = 0; i < numLines; i++) {
+            const lineProgress = (elapsed * 0.005 + i * 0.5) % 1;
+            const startX = effect.tileX + Math.random() * effect.tileWidth;
+            const startY = effect.tileY + Math.random() * effect.tileHeight;
+            const endX = startX + (Math.random() - 0.5) * 20;
+            const endY = startY + (Math.random() - 0.5) * 20;
+            
+            effect.lineStyle(1, targetColor, 0.8);
+            effect.moveTo(startX, startY);
+            effect.lineTo(endX, endY);
+        }
+        
+        // Add border glow effect
+        const borderGlow = 2 + Math.sin(elapsed * 0.008) * 1;
+        effect.lineStyle(borderGlow, targetColor, 0.6);
+        effect.drawRect(effect.tileX - borderGlow/2, effect.tileY - borderGlow/2, 
+                       effect.tileWidth + borderGlow, effect.tileHeight + borderGlow);
+    }
+
+    createDeathAnimation(character) {
+        if (!character || !character.sprite) return;
+        
+        console.log('Starting death animation for character:', character.id);
+        
+        // Simple death animation: turn gray and fade out
+        character.isDying = true;
+        
+        // Make soul gray and stop moving
+        character.sprite.tint = 0x808080; // Gray color
+        console.log('Set character tint to gray');
+        
+        // Animate the death effect
+        const startTime = Date.now();
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / 2000; // 2000ms duration
+            
+            if (progress < 1) {
+                // Gradually reduce transparency
+                character.sprite.alpha = 1 - progress;
+                
+                if (elapsed % 500 < 50) { // Log every 500ms
+                    console.log(`Death animation progress: ${Math.round(progress * 100)}%, alpha: ${character.sprite.alpha}`);
+                }
+                
+                requestAnimationFrame(animate);
+            } else {
+                // Cleanup - make completely invisible
+                if (character.sprite) {
+                    character.sprite.alpha = 0;
+                    console.log('Death animation completed');
+                }
+            }
+        };
+        
+        animate();
     }
 }
 
@@ -461,25 +704,61 @@ class GameMap {
     constructor(app) {
         this.app = app;
         this.container = new Container();
+        this.tileContainer = new Container();
+        this.tileMap = null;
+        this.grayTileTexture = null;
+        this.greenTileTexture = null;
     }
 
     async createMap() {
-        await this.createBackground();
+        await this.loadTileTextures();
+        this.container.addChild(this.tileContainer);
     }
 
-    async createBackground() {
-        // Load the background image
-        const texture = await Assets.load('./resources/background-2.png');
+    async loadTileTextures() {
+        // Load tile textures
+        this.grayTileTexture = await Assets.load('./resources/background_gray_100x60.png');
+        this.greenTileTexture = await Assets.load('./resources/background_green_100x60.png');
+    }
+
+    updateTileMap(tileMapData) {
+        if (!tileMapData || !this.grayTileTexture || !this.greenTileTexture) return;
         
-        // Create a sprite from the background texture
-        const backgroundSprite = new Sprite(texture);
+        // Clear existing tiles
+        this.tileContainer.removeChildren();
         
-        // Scale the background to fit the screen
-        backgroundSprite.width = this.app.screen.width;
-        backgroundSprite.height = this.app.screen.height;
+        // Store tile map data
+        this.tileMap = tileMapData;
         
-        // Add the background sprite to the container
-        this.container.addChild(backgroundSprite);
+        // Render tiles based on server data
+        for (let y = 0; y < tileMapData.height; y++) {
+            for (let x = 0; x < tileMapData.width; x++) {
+                const tileData = tileMapData.tiles[y][x];
+                const texture = tileData.type === 'gray' ? this.grayTileTexture : this.greenTileTexture;
+                
+                const tileSprite = new Sprite(texture);
+                tileSprite.x = tileData.worldX;
+                tileSprite.y = tileData.worldY;
+                // Scale the 100x60 tiles down to 25x15
+                tileSprite.width = 25;
+                tileSprite.height = 15;
+                
+                this.tileContainer.addChild(tileSprite);
+            }
+        }
+    }
+
+    updateSingleTile(tileX, tileY, newType) {
+        if (!this.tileMap || !this.grayTileTexture || !this.greenTileTexture) return;
+        
+        // Find and update the specific tile sprite
+        const tileIndex = tileY * this.tileMap.width + tileX;
+        const tileSprite = this.tileContainer.getChildAt(tileIndex);
+        
+        if (tileSprite) {
+            const texture = newType === 'gray' ? this.grayTileTexture : this.greenTileTexture;
+            tileSprite.texture = texture;
+        }
     }
 
 }

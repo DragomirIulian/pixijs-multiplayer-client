@@ -10,6 +10,7 @@ export class Character {
         // Energy attributes - all from server
         this.energy = characterData.energy;
         this.maxEnergy = characterData.maxEnergy;
+        this.isCasting = characterData.isCasting || false;
         
         // Current position - all from server
         this.x = characterData.x;
@@ -18,6 +19,9 @@ export class Character {
         // Target position from server
         this.targetX = this.x;
         this.targetY = this.y;
+        
+        // Spell preparation state
+        this.isPreparing = characterData.isPreparing || false;
         
         // Interpolation
         this.interpolationSpeed = 0.1;
@@ -55,13 +59,19 @@ export class Character {
         
         // Update energy from server
         if (characterData.energy !== undefined) {
-            this.energy = characterData.energy;
+            this.energy = Math.floor(characterData.energy);
         }
         if (characterData.maxEnergy !== undefined) {
-            this.maxEnergy = characterData.maxEnergy;
+            this.maxEnergy = Math.floor(characterData.maxEnergy);
         }
         if (characterData.name !== undefined) {
             this.name = characterData.name;
+        }
+        if (characterData.isCasting !== undefined) {
+            this.isCasting = characterData.isCasting;
+        }
+        if (characterData.isPreparing !== undefined) {
+            this.isPreparing = characterData.isPreparing;
         }
         
         // Update any other properties from server
@@ -72,11 +82,11 @@ export class Character {
 
     // Energy management methods
     setEnergy(value) {
-        this.energy = Math.max(0, Math.min(this.maxEnergy, value));
+        this.energy = Math.floor(Math.max(0, Math.min(this.maxEnergy, value)));
     }
 
     getEnergy() {
-        return this.energy;
+        return Math.floor(this.energy);
     }
 
     getEnergyPercentage() {
@@ -95,19 +105,41 @@ export class Character {
     update(time) {
         if (!this.sprite) return;
 
-        // Movement interpolation
-        this.x += (this.targetX - this.x) * this.interpolationSpeed;
-        this.y += (this.targetY - this.y) * this.interpolationSpeed;
+        // Don't move if dying
+        if (!this.isDying) {
+            // Movement interpolation
+            this.x += (this.targetX - this.x) * this.interpolationSpeed;
+            this.y += (this.targetY - this.y) * this.interpolationSpeed;
+        }
         
-        // Apply floating animation
-        this.floatOffset += this.floatSpeed * time.deltaTime;
-        const floatY = Math.sin(this.floatOffset) * this.floatAmplitude;
+        // Apply floating animation (but not when dying)
+        if (!this.isDying) {
+            this.floatOffset += this.floatSpeed * time.deltaTime;
+        }
+        const floatY = this.isDying ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
         
         // Update sprite position
         this.sprite.x = this.x;
         this.sprite.y = this.y + floatY;
         
-        // Add slight rotation for floating effect
-        this.sprite.rotation = Math.sin(this.floatOffset * 2) * 0.1;
+        // Visual feedback for casting and preparing (but not if dying)
+        if (this.isCasting && !this.isDying) {
+            // Color tint when casting
+            const castingColor = this.type === 'dark-soul' ? 0x8B0000 : 0xFFD700;
+            this.sprite.tint = castingColor;
+        } else if (this.isPreparing && !this.isDying) {
+            // Different color when preparing to cast (lighter tint)
+            const preparingColor = this.type === 'dark-soul' ? 0xFF6B6B : 0xFFE066;
+            this.sprite.tint = preparingColor;
+        } else if (!this.isDying) {
+            // Normal appearance (only if not dying)
+            this.sprite.tint = 0xFFFFFF;
+        }
+        // If dying, don't change tint (death animation controls it)
+        
+        // Add slight rotation for floating effect (but not when dying)
+        if (!this.isDying) {
+            this.sprite.rotation = Math.sin(this.floatOffset * 2) * 0.1;
+        }
     }
 }

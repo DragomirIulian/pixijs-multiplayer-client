@@ -100,7 +100,7 @@ export class CharacterCard {
         this.selectedCharacter = character;
         this.nameText.text = `Name: ${character.name}`;
         this.idText.text = `ID: ${character.id}`;
-        this.energyText.text = `Energy: ${character.getEnergy()}/${character.maxEnergy}`;
+        this.energyText.text = `Energy: ${Math.floor(character.getEnergy())}/${Math.floor(character.maxEnergy)}`;
         
         // Update energy bar
         this.updateEnergyBar();
@@ -117,7 +117,7 @@ export class CharacterCard {
         if (!this.infoCard.visible || !this.selectedCharacter) return;
         
         // Update energy text and bar
-        this.energyText.text = `Energy: ${this.selectedCharacter.getEnergy()}/${this.selectedCharacter.maxEnergy}`;
+        this.energyText.text = `Energy: ${Math.floor(this.selectedCharacter.getEnergy())}/${Math.floor(this.selectedCharacter.maxEnergy)}`;
         this.updateEnergyBar();
     }
 
