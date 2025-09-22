@@ -140,7 +140,6 @@ setInterval(() => {
 ```javascript
 // Pseudo-code for WebSocket server
 wss.on('connection', (ws) => {
-  console.log('Client connected');
   
   // Send initial world state
   ws.send(JSON.stringify({
@@ -149,7 +148,6 @@ wss.on('connection', (ws) => {
   }));
   
   ws.on('close', () => {
-    console.log('Client disconnected');
   });
 });
 ```
@@ -249,7 +247,6 @@ function broadcastToAll(message) {
 
 // WebSocket handling
 wss.on('connection', (ws) => {
-  console.log('Client connected');
   
   // Send current world state
   ws.send(JSON.stringify({
@@ -264,7 +261,6 @@ wss.on('connection', (ws) => {
   }));
   
   ws.on('close', () => {
-    console.log('Client disconnected');
   });
 });
 
@@ -279,7 +275,6 @@ function startGame() {
 }
 
 startGame();
-console.log('Server running on ws://localhost:3000');
 ```
 
 ## Testing
