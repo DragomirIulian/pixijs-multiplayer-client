@@ -7,7 +7,9 @@ import { EffectsSystem } from './systems/EffectsSystem.js';
 import { CharacterManager } from './managers/CharacterManager.js';
 import { EnergyOrbManager } from './managers/EnergyOrbManager.js';
 import { SpellManager } from './managers/SpellManager.js';
+import { DayNightManager } from './managers/DayNightManager.js';
 import { NetworkHandler } from './handlers/NetworkHandler.js';
+import StatisticsDisplay from './managers/StatisticsDisplay.js';
 
 /**
  * Game - Main orchestrator class following Single Responsibility Principle
@@ -34,7 +36,11 @@ export class Game {
         this.characterManager = null;
         this.energyOrbManager = null;
         this.spellManager = null;
+        this.dayNightManager = null;
         this.networkHandler = null;
+        this.statisticsDisplay = null;
+        console.log('init..');
+
         
         this.init();
     }
@@ -83,9 +89,22 @@ export class Game {
 
     setupManagers() {
         // Initialize managers with focused responsibilities
+        console.log('Setting up managers...');
         this.characterManager = new CharacterManager(this.app, this.characterCard);
         this.energyOrbManager = new EnergyOrbManager(this.app);
         this.spellManager = new SpellManager(this.app);
+        console.log('About to create DayNightManager...');
+        this.dayNightManager = new DayNightManager(this.app, this.gameMap);
+        console.log('DayNightManager created:', this.dayNightManager);
+        
+        // Initialize statistics display
+        this.statisticsDisplay = new StatisticsDisplay();
+        
+        // Make statisticsDisplay available globally for HTML button
+        window.statsDisplay = this.statisticsDisplay;
+        
+        // Make game instance available globally for network requests
+        window.game = this;
     }
 
     setupSystems() {
@@ -98,7 +117,9 @@ export class Game {
             this.energyOrbManager,
             this.spellManager,
             this.gameMap,
-            this.effectsSystem
+            this.effectsSystem,
+            this.dayNightManager,
+            this.statisticsDisplay
         );
     }
 
@@ -120,6 +141,7 @@ export class Game {
         this.characterManager.updateCharacters(time);
         this.energyOrbManager.updateOrbs(time);
         this.spellManager.updateSpells(time, this.effectsSystem);
+        this.dayNightManager.update(time);
         
         // Update UI components
         if (this.characterCard) {

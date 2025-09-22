@@ -81,7 +81,7 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 8,
+    SOULS_PER_TEAM: 10,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
@@ -108,6 +108,29 @@ const GameConfig = {
     MATING_TIME: 10000,         // 10 seconds to complete mating
     CHILD_MATURITY_TIME: 30000, // 30 seconds for child to become adult
     HEARTS_DISPLAY_TIME: 12000  // 12 seconds to show hearts
+  },
+
+  // Day/Night cycle configuration
+  DAY_NIGHT: {
+    CYCLE_DURATION: 120000,     // 2 minutes for full day/night cycle (120000ms)
+    DAY_DURATION: 0.6,          // 60% of cycle is day
+    NIGHT_DURATION: 0.4,        // 40% of cycle is night
+    TRANSITION_DURATION: 0.1,   // 10% for dawn/dusk transitions
+    
+    // Team-specific bonuses
+    LIGHT_TEAM_DAY_SPEED_MULTIPLIER: 2,     // Light team gets 50% speed boost during day
+    LIGHT_TEAM_DAY_CAST_TIME_MULTIPLIER: 0.5, // Light team gets 30% faster spell CASTING TIME during day
+    
+    DARK_TEAM_NIGHT_SPEED_MULTIPLIER: 2,    // Dark team gets 50% speed boost during night  
+    DARK_TEAM_NIGHT_CAST_TIME_MULTIPLIER: 0.5, // Dark team gets 30% faster spell CASTING TIME during night
+    
+    // General effects
+    NIGHT_ENERGY_MULTIPLIER: 1,  // Energy orbs give 50% more at night
+    
+    // Visual settings
+    DAY_AMBIENT_LIGHT: 1.0,     // Full brightness during day
+    NIGHT_AMBIENT_LIGHT: 0.3,   // 30% brightness during night
+    TRANSITION_SPEED: 0.05      // How fast lighting transitions
   }
 };
 

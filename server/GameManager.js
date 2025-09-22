@@ -4,6 +4,8 @@ const MovementSystem = require('./systems/MovementSystem');
 const CombatSystem = require('./systems/CombatSystem');
 const SpellSystem = require('./systems/SpellSystem');
 const MatingSystem = require('./systems/MatingSystem');
+const DayNightSystem = require('./systems/DayNightSystem');
+const StatisticsManager = require('./systems/StatisticsManager');
 
 /**
  * Main Game Manager
@@ -14,12 +16,13 @@ class GameManager {
     this.souls = new Map();
     this.energyOrbs = new Map();
     this.tileMap = null;
-    
     // Initialize systems
     this.movementSystem = null; // Will be initialized after tileMap
     this.combatSystem = null; // Will be initialized after spellSystem
     this.spellSystem = null; // Will be initialized after tileMap
     this.matingSystem = null; // Will be initialized after all other systems
+    this.dayNightSystem = null; // Day/night cycle system
+    this.statisticsManager = null; // Statistics tracking system
     
     // Game state
     this.gameEvents = [];
@@ -64,10 +67,13 @@ class GameManager {
   }
 
   initializeSystems() {
+    this.dayNightSystem = new DayNightSystem();
     this.movementSystem = new MovementSystem(this.tileMap);
-    this.spellSystem = new SpellSystem(this.tileMap);
+    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem);
     this.combatSystem = new CombatSystem(this.spellSystem);
     this.matingSystem = new MatingSystem(this);
+    this.statisticsManager = new StatisticsManager();
+    this.statisticsManager.initialize(this);
   }
 
   spawnInitialSouls() {
@@ -219,6 +225,10 @@ class GameManager {
   update() {
     this.gameEvents = [];
 
+    // Update day/night cycle FIRST (affects other systems)
+    const dayNightEvents = this.dayNightSystem.update();
+    this.gameEvents.push(...dayNightEvents);
+
     // Update all souls
     this.souls.forEach(soul => {
       soul.update(this.souls);
@@ -227,9 +237,10 @@ class GameManager {
     // Remove dead souls
     this.handleSoulDeaths();
 
-    // Update movement system
+    // Update movement system (with team-specific day/night speed modifier)
     this.souls.forEach(soul => {
-      this.movementSystem.updateSoul(soul, this.souls, this.energyOrbs);
+      const movementMultiplier = this.dayNightSystem.getMovementMultiplier(soul.type);
+      this.movementSystem.updateSoul(soul, this.souls, this.energyOrbs, movementMultiplier);
     });
 
     // Update spell system FIRST (but don't complete spells yet)
@@ -251,7 +262,7 @@ class GameManager {
     const matingEvents = this.matingSystem.update(this.souls);
     this.gameEvents.push(...matingEvents);
 
-    // Process energy orb collection
+    // Process energy orb collection (with day/night energy modifier)
     this.processOrbCollection();
 
     // Handle energy orb respawning
@@ -259,6 +270,10 @@ class GameManager {
 
     // Handle soul respawning (emergency only)
     this.handleSoulRespawning();
+
+    // Update statistics with current game state and events
+    this.statisticsManager.processGameEvents(this.gameEvents);
+    this.statisticsManager.updateFromGameState(this);
 
     // Return events for broadcasting
     const eventsToReturn = [...this.gameEvents];
@@ -275,8 +290,9 @@ class GameManager {
           const distance = soul.getDistanceTo(orb);
           
           if (distance < GameConfig.ORB.COLLECTION_RADIUS && orb.teamType === soul.getTeamType()) {
-            // Soul collects energy
-            soul.addEnergy(orb.energy);
+            // Soul collects energy (with day/night multiplier)
+            const energyValue = orb.energy * this.dayNightSystem.getEnergyMultiplier();
+            soul.addEnergy(energyValue);
             
             // Set orb to respawn
             orb.respawnTime = Date.now() + 
@@ -288,7 +304,8 @@ class GameManager {
               type: 'orb_collected',
               orbId: orb.id,
               collectorId: soul.id,
-              respawnTime: orb.respawnTime
+              respawnTime: orb.respawnTime,
+              energyValue: energyValue
             });
 
           }
@@ -467,6 +484,14 @@ class GameManager {
       startTime: spell.startTime,
       duration: GameConfig.SOUL.SPELL_CAST_TIME
     }));
+  }
+
+  getDayNightState() {
+    return this.dayNightSystem.getState();
+  }
+
+  getStatistics() {
+    return this.statisticsManager.getClientStats();
   }
 }
 

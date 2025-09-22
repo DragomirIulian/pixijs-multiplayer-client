@@ -5,12 +5,14 @@ import { ClientConfig } from '../config/clientConfig.js';
  * Handles all server message processing and delegation
  */
 export class NetworkHandler {
-    constructor(characterManager, energyOrbManager, spellManager, gameMap, effectsSystem) {
+    constructor(characterManager, energyOrbManager, spellManager, gameMap, effectsSystem, dayNightManager, statisticsDisplay) {
         this.characterManager = characterManager;
         this.energyOrbManager = energyOrbManager;
         this.spellManager = spellManager;
         this.gameMap = gameMap;
         this.effectsSystem = effectsSystem;
+        this.dayNightManager = dayNightManager;
+        this.statisticsDisplay = statisticsDisplay;
     }
 
     handleServerMessage(data) {
@@ -31,7 +33,7 @@ export class NetworkHandler {
                 }, ClientConfig.ANIMATION.CHARACTER_REMOVE_DELAY);
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs, data.tileMap, data.activeSpells);
+                this.updateWorldState(data.characters, data.energyOrbs, data.tileMap, data.activeSpells, data.dayNightState, data.statistics);
                 break;
             case 'orb_spawned':
                 this.energyOrbManager.spawnEnergyOrb(data.orb);
@@ -68,6 +70,19 @@ export class NetworkHandler {
                 break;
             case 'character_death':
                 this.characterManager.handleCharacterDeath(data, this.effectsSystem);
+                // Notify statistics display for visual feedback
+                if (this.statisticsDisplay) {
+                    this.statisticsDisplay.processGameEvent(data);
+                }
+                break;
+            case 'day_night_phase_change':
+                this.dayNightManager.updateState(data);
+                break;
+            case 'statistics_update':
+                this.statisticsDisplay.updateStatistics(data.statistics);
+                break;
+            case 'statistics_response':
+                this.statisticsDisplay.updateStatistics(data.statistics);
                 break;
         }
     }
@@ -78,7 +93,7 @@ export class NetworkHandler {
         this.spellManager.clearAllSpells();
     }
 
-    updateWorldState(charactersData, energyOrbsData, tileMapData, activeSpellsData) {
+    updateWorldState(charactersData, energyOrbsData, tileMapData, activeSpellsData, dayNightState, statistics) {
         // Smart update - only change what's different to prevent visual glitches
         this.updateCharactersSmartly(charactersData);
         this.updateEnergyOrbsSmartly(energyOrbsData);
@@ -87,6 +102,16 @@ export class NetworkHandler {
         // Update tile map only if provided (usually only on first connect)
         if (tileMapData && this.gameMap) {
             this.gameMap.updateTileMap(tileMapData);
+        }
+        
+        // Update day/night state
+        if (dayNightState && this.dayNightManager) {
+            this.dayNightManager.updateState(dayNightState);
+        }
+        
+        // Update statistics
+        if (statistics && this.statisticsDisplay) {
+            this.statisticsDisplay.updateStatistics(statistics);
         }
     }
 
@@ -187,6 +212,11 @@ export class NetworkHandler {
         // Create sparkle effect for birth
         if (this.effectsSystem && data.childData) {
             this.effectsSystem.createChildSpawnEffect(data.childData.x, data.childData.y);
+        }
+        
+        // Notify statistics display for visual feedback
+        if (this.statisticsDisplay) {
+            this.statisticsDisplay.processGameEvent(data);
         }
     }
 

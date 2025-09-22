@@ -20,7 +20,7 @@ export const ClientConfig = {
 
   // Character configuration
   CHARACTER: {
-    SCALE: 0.1,
+    SCALE: 0.08,
     INTERPOLATION_SPEED: 0.1,
     FLOATING_AMPLITUDE: 3,
     FLOATING_SPEED: 0.05
@@ -170,5 +170,27 @@ export const ClientConfig = {
     TILE_TEXTURE_HEIGHT: 60,
     TILE_DISPLAY_WIDTH: 25,
     TILE_DISPLAY_HEIGHT: 15
+  },
+
+  // Day/Night cycle configuration
+  DAY_NIGHT: {
+    // Visual indicator settings
+    SUN_MOON_SIZE: 80,          // Size of sun/moon icons (made slightly bigger)
+    SUN_MOON_POSITION_X: 710,   // X position - center of 1500px wide screen
+    SUN_MOON_POSITION_Y: 50,    // Y position from top
+    
+    // Time display settings
+    TIME_DISPLAY_X: 50,         // X position for time text
+    TIME_DISPLAY_Y: 120,        // Y position for time text
+    TIME_FONT_SIZE: 16,
+    TIME_TEXT_COLOR: 0xFFFFFF,
+    
+    // Visual effects
+    DAY_BACKGROUND_TINT: 0xFFFFFF,    // Normal white tint for day
+    NIGHT_BACKGROUND_TINT: 0x8888CC,  // Lighter blue tint for night
+    DAWN_BACKGROUND_TINT: 0xFFCC88,   // Orange tint for dawn
+    DUSK_BACKGROUND_TINT: 0xFF8844,   // Deeper orange for dusk
+    
+    TRANSITION_SPEED: 0.02,     // How fast visual transitions occur
   }
 };

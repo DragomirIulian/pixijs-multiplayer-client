@@ -26,15 +26,237 @@
         #instructions {
             position: absolute;
             top: 10px;
-            left: 10px;
+            left: 310px;
             color: white;
             font-size: 14px;
             z-index: 100;
+        }
+        
+        #statistics-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(44, 62, 80, 0.8);
+            color: white;
+            padding: 15px;
+            border: 3px solid rgba(51, 51, 51, 0.8);
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 100;
+            min-width: 250px;
+            max-width: 280px;
+        }
+        
+        #statistics-panel.minimized {
+            height: auto;
+        }
+        
+        .stats-minimize-btn {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: #FFD700;
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            line-height: 16px;
+        }
+        
+        .stats-minimize-btn:hover {
+            color: #FFA500;
+        }
+        
+        .stats-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+        }
+        
+        .stats-content.minimized {
+            max-height: 0;
+            opacity: 0;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .stats-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            color: #FFD700;
+        }
+        
+        .team-stats {
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 2px solid rgba(68, 68, 68, 0.8);
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .team-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .team-light {
+            border-left: 4px solid #FFD700;
+        }
+        
+        .team-dark {
+            border-left: 4px solid #8A2BE2;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        
+        .percentage-bar {
+            width: 100%;
+            height: 20px;
+            background-color: rgba(51, 51, 51, 0.8);
+            border: 2px solid rgba(85, 85, 85, 0.8);
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .percentage-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .light-fill {
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+        }
+        
+        .dark-fill {
+            background: linear-gradient(90deg, #8A2BE2, #4B0082);
+        }
+        
+        .game-stats {
+            border-top: 2px solid rgba(68, 68, 68, 0.8);
+            padding-top: 10px;
+            margin-top: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .toggle-detailed {
+            background: #2c3e50;
+            border: 2px solid #333;
+            color: white;
+            padding: 8px 12px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            width: 100%;
+        }
+        
+        .toggle-detailed:hover {
+            background: #34495e;
+            border-color: #555;
         }
     </style>
 </head>
 <body>
     <div id="instructions">
+    </div>
+    <div id="statistics-panel">
+        <button class="stats-minimize-btn" onclick="toggleStatsPanel()">−</button>
+        <div class="stats-header">GAME STATISTICS</div>
+        
+        <div class="stats-content" id="stats-content">
+            <div class="team-stats team-light" id="light-stats">
+            <div class="team-name">Light Souls</div>
+            <div class="stat-row">
+                <span>Population:</span>
+                <span id="light-population">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Adults:</span>
+                <span id="light-adults">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Children:</span>
+                <span id="light-children">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Births:</span>
+                <span id="light-births">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Deaths:</span>
+                <span id="light-deaths">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Territory:</span>
+                <span id="light-territory">0</span>
+            </div>
+        </div>
+        
+        <div class="percentage-bar">
+            <div class="percentage-fill light-fill" id="light-percentage" style="width: 50%"></div>
+        </div>
+        <div style="text-align: center; margin-bottom: 10px; font-size: 11px;">
+            <div style="margin-bottom: 3px; color: #ccc;">Territory Control</div>
+            <span id="light-percent-text">50.0%</span> vs <span id="dark-percent-text">50.0%</span>
+        </div>
+        
+        <div class="team-stats team-dark" id="dark-stats">
+            <div class="team-name">Dark Souls</div>
+            <div class="stat-row">
+                <span>Population:</span>
+                <span id="dark-population">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Adults:</span>
+                <span id="dark-adults">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Children:</span>
+                <span id="dark-children">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Births:</span>
+                <span id="dark-births">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Deaths:</span>
+                <span id="dark-deaths">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Territory:</span>
+                <span id="dark-territory">0</span>
+            </div>
+        </div>
+        
+        <div class="game-stats">
+            <div class="stat-row">
+                <span>Total Population:</span>
+                <span id="total-population">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Total Births:</span>
+                <span id="total-births">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Total Deaths:</span>
+                <span id="total-deaths">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Game Uptime:</span>
+                <span id="game-uptime">0m 0s</span>
+            </div>
+        </div>
+        
+        </div>
     </div>
     <div id="game-container"></div>
     

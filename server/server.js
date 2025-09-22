@@ -12,6 +12,7 @@ const gameManager = new GameManager();
 
 // Track for periodic world state sync
 let lastWorldStateSync = Date.now();
+let lastStatisticsSync = Date.now();
 
 function broadcastToAll(message) {
   wss.clients.forEach(client => {
@@ -49,6 +50,15 @@ function gameLoop() {
     broadcastWorldState();
     lastWorldStateSync = now;
   }
+
+  // Broadcast statistics every 5 seconds
+  if (now - lastStatisticsSync >= 5000) {
+    broadcastToAll({
+      type: 'statistics_update',
+      statistics: gameManager.getStatistics()
+    });
+    lastStatisticsSync = now;
+  }
 }
 
 function broadcastWorldState() {
@@ -57,7 +67,9 @@ function broadcastWorldState() {
     characters: gameManager.getSouls(),
     energyOrbs: gameManager.getEnergyOrbs(),
     tileMap: gameManager.getTileMap(),
-    activeSpells: gameManager.getActiveSpells()
+    activeSpells: gameManager.getActiveSpells(),
+    dayNightState: gameManager.getDayNightState(),
+    statistics: gameManager.getStatistics()
   });
 }
 
@@ -69,9 +81,27 @@ wss.on('connection', (ws) => {
     characters: gameManager.getSouls(),
     energyOrbs: gameManager.getEnergyOrbs(),
     tileMap: gameManager.getTileMap(),
-    activeSpells: gameManager.getActiveSpells()
+    activeSpells: gameManager.getActiveSpells(),
+    dayNightState: gameManager.getDayNightState(),
+    statistics: gameManager.getStatistics()
   }));
   
+  // Handle messages from client
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data);
+      
+      if (message.type === 'request_statistics') {
+        ws.send(JSON.stringify({
+          type: 'statistics_response',
+          statistics: gameManager.getStatistics()
+        }));
+      }
+    } catch (error) {
+      console.error('Error handling client message:', error);
+    }
+  });
+
   ws.on('close', () => {
   });
 });

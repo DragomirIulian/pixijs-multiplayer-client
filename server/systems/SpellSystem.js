@@ -6,8 +6,9 @@ const { SoulStates } = require('../entities/SoulStateMachine');
  * Handles spell casting, preparation, and effects
  */
 class SpellSystem {
-  constructor(tileMap) {
+  constructor(tileMap, dayNightSystem = null) {
     this.tileMap = tileMap;
+    this.dayNightSystem = dayNightSystem;
     this.activeSpells = new Map();
     this.spellEvents = [];
   }
@@ -114,13 +115,18 @@ class SpellSystem {
   startSpellCasting(soul, targetTile, allSouls) {
     const spellId = `spell-${soul.id}-${Date.now()}`;
     
+    // Get team-specific cast time multiplier
+    const castTimeMultiplier = this.dayNightSystem ? 
+      this.dayNightSystem.getSpellCastTimeMultiplier(soul.type) : 1.0;
+    const adjustedCastTime = GameConfig.SOUL.SPELL_CAST_TIME * castTimeMultiplier;
+    
     const spell = {
       id: spellId,
       casterId: soul.id,
       casterType: soul.type,
       targetTile: targetTile,
       startTime: Date.now(),
-      completionTime: Date.now() + GameConfig.SOUL.SPELL_CAST_TIME,
+      completionTime: Date.now() + adjustedCastTime,
       casterX: soul.x,
       casterY: soul.y,
       targetX: targetTile.worldX + this.tileMap.tileWidth / 2,
@@ -151,7 +157,7 @@ class SpellSystem {
         targetY: spell.targetY,
         targetTileX: targetTile.x,
         targetTileY: targetTile.y,
-        duration: GameConfig.SOUL.SPELL_CAST_TIME
+        duration: adjustedCastTime
       }
     });
 

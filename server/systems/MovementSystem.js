@@ -10,7 +10,7 @@ class MovementSystem {
     this.tileMap = tileMap;
   }
 
-  updateSoul(soul, allSouls, energyOrbs) {
+  updateSoul(soul, allSouls, energyOrbs, movementMultiplier = 1.0) {
     if (!soul) return;
 
     const soulState = soul.getCurrentState();
@@ -18,7 +18,7 @@ class MovementSystem {
     // Handle special states first
     if (soulState === SoulStates.MATING) {
       // Mating souls should move toward their partner if too far apart
-      this.handleMatingMovement(soul, allSouls);
+      this.handleMatingMovement(soul, allSouls, movementMultiplier);
       this.applyMovement(soul);
       return;
     }
@@ -40,13 +40,13 @@ class MovementSystem {
 
     let moveTarget = null;
     let movementType = 'wander';
-    let speed = GameConfig.SOUL.MOVEMENT_SPEED;
+    let speed = GameConfig.SOUL.MOVEMENT_SPEED * movementMultiplier;
 
     switch (soulState) {
       case SoulStates.DEFENDING:
         moveTarget = this.getDefenseTarget(soul, allSouls);
         movementType = 'defend';
-        speed = GameConfig.SOUL.MOVEMENT_SPEED * GameConfig.SOUL.DEFEND_SPEED_MULTIPLIER;
+        speed = GameConfig.SOUL.MOVEMENT_SPEED * GameConfig.SOUL.DEFEND_SPEED_MULTIPLIER * movementMultiplier;
         // Check if close enough to stop and attack
         if (moveTarget && this.isCloseEnoughToAttack(soul, moveTarget)) {
           soul.setVelocity(0, 0);
@@ -506,7 +506,7 @@ class MovementSystem {
     }
   }
 
-  handleMatingMovement(soul, allSouls) {
+  handleMatingMovement(soul, allSouls, movementMultiplier = 1.0) {
     // If soul is mating and has a partner, move toward the partner if too far apart
     if (!soul.matingPartner) {
       // No partner, stop moving
@@ -522,7 +522,7 @@ class MovementSystem {
       // Too far from partner - move closer
       const dx = partner.x - soul.x;
       const dy = partner.y - soul.y;
-      const speed = GameConfig.SOUL.MOVEMENT_SPEED * 0.5; // Slower speed for mating
+      const speed = GameConfig.SOUL.MOVEMENT_SPEED * 0.5 * movementMultiplier; // Slower speed for mating
       
       // Normalize and apply movement
       const normalizedDx = dx / distance;
@@ -536,7 +536,7 @@ class MovementSystem {
       // Too close - move away slightly
       const dx = soul.x - partner.x;
       const dy = soul.y - partner.y;
-      const speed = GameConfig.SOUL.MOVEMENT_SPEED * 0.2; // Very slow
+      const speed = GameConfig.SOUL.MOVEMENT_SPEED * 0.2 * movementMultiplier; // Very slow
       
       // Normalize and apply movement
       const normalizedDx = dx / distance;
