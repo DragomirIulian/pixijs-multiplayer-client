@@ -37,7 +37,7 @@ export class NetworkHandler {
                 }, ClientConfig.ANIMATION.CHARACTER_REMOVE_DELAY);
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics);
+                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores);
                 break;
             case 'orb_spawned':
                 this.energyOrbManager.spawnEnergyOrb(data.orb);
@@ -108,7 +108,7 @@ export class NetworkHandler {
         this.spellManager.clearAllSpells();
     }
 
-    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics) {
+    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores) {
         // Smart update - only change what's different to prevent visual glitches
         this.updateCharactersSmartly(charactersData);
         this.updateEnergyOrbsSmartly(energyOrbsData);
@@ -117,7 +117,12 @@ export class NetworkHandler {
         
         // Update tile map only if provided (usually only on first connect)
         if (tileMapData && this.gameMap) {
-            this.gameMap.updateTileMap(tileMapData);
+            this.gameMap.updateTileMap(tileMapData, borderScores);
+        }
+        
+        // Update border scores if provided separately
+        if (borderScores && this.gameMap) {
+            this.gameMap.updateBorderScores(borderScores);
         }
         
         // Update day/night state

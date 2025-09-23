@@ -6,9 +6,10 @@ const { SoulStates } = require('../entities/SoulStateMachine');
  * Handles spell casting, preparation, and effects
  */
 class SpellSystem {
-  constructor(tileMap, dayNightSystem = null) {
+  constructor(tileMap, dayNightSystem = null, movementSystem = null) {
     this.tileMap = tileMap;
     this.dayNightSystem = dayNightSystem;
+    this.movementSystem = movementSystem;
     this.activeSpells = new Map();
     this.spellEvents = [];
     
@@ -56,7 +57,10 @@ class SpellSystem {
         const newTileType = spell.casterType === 'dark-soul' ? 'gray' : 'green';
         const capturedTiles = this.captureTunnel(spell.targetTile, newTileType);
         
-        // No need to update Manhattan scores - they never change!
+        // Update border scores when tiles are captured
+        if (this.movementSystem && this.movementSystem.updateBorderScores) {
+          this.movementSystem.updateBorderScores();
+        }
 
         // Broadcast spell completion FIRST to stop animations
         completionEvents.push({

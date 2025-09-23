@@ -81,7 +81,7 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 1,
+    SOULS_PER_TEAM: 7,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
@@ -101,7 +101,7 @@ const GameConfig = {
 
   // Mating and reproduction configuration
   MATING: {
-    MIN_RESTING_SOULS: 0,       // Minimum souls per team to avoid extinction
+    MIN_RESTING_SOULS: 3,       // Minimum souls per team to avoid extinction
     MAX_SOULS_PER_TEAM: 10,      // Maximum souls per team
     MIN_ENERGY_FOR_MATING: 0.5, // 30% energy required to mate (reduced for testing)
     MATING_RANGE: 120,          // Distance souls need to be for mating (increased)
@@ -148,13 +148,16 @@ const GameConfig = {
     },
     DARK_NEXUS: {
       TILE_X: 54,               // Right top corner  
-      TILE_Y: 5
+      TILE_Y: 15                // Lowered by ~100 pixels (about 6-7 tiles)
     },
 
     // Combat and pathfinding
     TUNNEL_WIDTH: 10,           // 10 tiles wide as requested (soul height limit)
     TUNNEL_PRIORITY_MULTIPLIER: 2.0,  // How much to prioritize tunnel tiles
-    MAX_ATTACK_DISTANCE: 10     // Maximum distance to consider for nexus attack
+    MAX_ATTACK_DISTANCE: 10,    // Maximum distance to consider for nexus attack
+    
+    // Border scoring system
+    BORDER_WIDTH: 4             // 100 pixels = ~4 tiles (25px each)
   }
 };
 

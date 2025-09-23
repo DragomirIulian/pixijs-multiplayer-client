@@ -82,7 +82,7 @@ class GameManager {
   initializeSystems() {
     this.dayNightSystem = new DayNightSystem();
     this.movementSystem = new MovementSystem(this.tileMap);
-    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem);
+    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem, this.movementSystem);
     this.combatSystem = new CombatSystem(this.spellSystem, this);
     this.matingSystem = new MatingSystem(this);
     this.statisticsManager = new StatisticsManager();
@@ -495,6 +495,10 @@ class GameManager {
 
   getTileMap() {
     return this.tileMap;
+  }
+
+  getBorderScores() {
+    return this.movementSystem ? this.movementSystem.borderScores : null;
   }
 
   getActiveSpells() {

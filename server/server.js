@@ -65,7 +65,8 @@ function broadcastWorldState() {
     tileMap: gameManager.getTileMap(),
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),
-    statistics: gameManager.getStatistics()
+    statistics: gameManager.getStatistics(),
+    borderScores: gameManager.getBorderScores()
   });
 }
 
@@ -80,7 +81,8 @@ wss.on('connection', (ws) => {
     tileMap: gameManager.getTileMap(),
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),
-    statistics: gameManager.getStatistics()
+    statistics: gameManager.getStatistics(),
+    borderScores: gameManager.getBorderScores()
   }));
   
   // Handle messages from client

@@ -160,5 +160,13 @@ export class Game {
 
 // Initialize game when page loads
 window.addEventListener('load', async () => {
-    new Game();
+    const game = new Game();
+    
+    // Add keyboard shortcut for toggling score display (S key)
+    document.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 's' && game.gameMap) {
+            game.gameMap.toggleScoreDisplay();
+            console.log('Score display toggled');
+        }
+    });
 });

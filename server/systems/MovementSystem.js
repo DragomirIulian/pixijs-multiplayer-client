@@ -9,13 +9,21 @@ class MovementSystem {
   constructor(tileMap) {
     this.tileMap = tileMap;
     
-    // Manhattan distance from each tile to enemy nexus
-    this.manhattanScores = {
-      green: [], // Distance from each tile to dark nexus (green team's target)
-      gray: []   // Distance from each tile to light nexus (gray team's target)
+    // Border scoring matrices for team-specific path finding
+    this.borderScores = {
+      green: [], // Light team scores (top+left border)
+      gray: []   // Dark team scores (right+bottom border)
     };
     
-    this.calculateManhattanDistances();
+    // Border rectangle coordinates
+    this.borderRect = {
+      left: 0,
+      top: 0, 
+      right: 0,
+      bottom: 0
+    };
+    
+    this.calculateBorderScoring();
   }
 
   updateSoul(soul, allSouls, energyOrbs, movementMultiplier = 1.0) {
@@ -74,9 +82,9 @@ class MovementSystem {
         break;
 
       case SoulStates.SEEKING:
-        moveTarget = this.findNearestEnemyTile(soul);
+        moveTarget = this.getMovementTarget(soul);
         if (!moveTarget) {
-          // If no enemy tiles to capture, move toward enemy nexus
+          // If no movement target, move toward enemy nexus
           moveTarget = this.getNexusTarget(soul);
         }
         movementType = 'seek';
@@ -196,43 +204,284 @@ class MovementSystem {
   findNearestEnemyTile(soul) {
     if (!this.tileMap || !soul) return null;
 
-    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
-    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
     const teamType = soul.teamType;
-    const opponentType = soul.type === 'dark-soul' ? 'green' : 'gray';
-
-    // Find the enemy tile with LOWEST Manhattan score that has a friendly tile next to it
+    
+    // Find the HIGHEST scoring tile on the entire map
+    let highestScoringTile = this.findHighestScoringTileOnMap(teamType);
+    if (!highestScoringTile) {
+      return null;
+    }
+    
+    // Check if soul can cast on the highest scoring tile (within spell range)
+    const distanceToHighestTile = Math.sqrt(
+      Math.pow(soul.x - highestScoringTile.worldX, 2) + 
+      Math.pow(soul.y - highestScoringTile.worldY, 2)
+    );
+    
+    if (distanceToHighestTile <= GameConfig.SOUL.SPELL_RANGE) {
+      // Can cast on highest scoring tile - return it as CAST target
+      return {
+        x: highestScoringTile.worldX,
+        y: highestScoringTile.worldY,
+        isCastTarget: true
+      };
+    }
+    
+    // Cannot cast yet - return NULL so soul doesn't think it can cast
+    // Movement will be handled separately by getMovementTarget()
+    return null;
+  }
+  
+  /**
+   * Get movement target for souls (separate from cast target)
+   */
+  getMovementTarget(soul) {
+    const teamType = soul.teamType;
+    
+    // Find the HIGHEST scoring tile on the entire map
+    let highestScoringTile = this.findHighestScoringTileOnMap(teamType);
+    if (!highestScoringTile) {
+      return null;
+    }
+    
+    // Move toward highest scoring tile using border path
+    return this.findBorderPathTowardsTarget(soul, highestScoringTile);
+  }
+  
+  
+  /**
+   * Find the highest scoring tile on the entire map for a team
+   */
+  findHighestScoringTileOnMap(teamType) {
     let bestTile = null;
-    let bestManhattanScore = Infinity;
-
-    // Check ALL tiles on the map
+    let bestScore = 0;
+    
     for (let y = 0; y < this.tileMap.height; y++) {
       for (let x = 0; x < this.tileMap.width; x++) {
-        const tile = this.tileMap.tiles[y][x];
-        
-        // Only consider enemy tiles
-        if (tile && tile.type === opponentType) {
-          // Check if this enemy tile has at least one friendly tile next to it
-          const hasFriendlyNeighbor = this.hasAdjacentFriendlyTile(x, y, teamType);
-          
-          if (hasFriendlyNeighbor) {
-            // Get Manhattan score for this tile
-            const manhattanScore = this.manhattanScores[teamType][y][x];
-            
-            // Pick the tile with lowest Manhattan score (closest to enemy nexus)
-            if (manhattanScore < bestManhattanScore) {
-              bestManhattanScore = manhattanScore;
-              bestTile = {
-                x: tile.worldX + this.tileMap.tileWidth / 2,
-                y: tile.worldY + this.tileMap.tileHeight / 2
-              };
-            }
-          }
+        const score = this.borderScores[teamType][y][x];
+        if (score > bestScore) {
+          bestScore = score;
+          bestTile = {
+            tileX: x,
+            tileY: y,
+            worldX: x * this.tileMap.tileWidth + this.tileMap.tileWidth / 2,
+            worldY: y * this.tileMap.tileHeight + this.tileMap.tileHeight / 2,
+            score: score
+          };
         }
       }
     }
-
+    
     return bestTile;
+  }
+
+  /**
+   * Find border path movement toward specific target tile
+   * First get to border, then move toward target
+   */
+  findBorderPathTowardsTarget(soul, targetTile) {
+    const teamType = soul.teamType;
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    
+    // Step 1: Check if soul is on their assigned border
+    if (!this.isOnAssignedBorderPath(soulTileX, soulTileY, teamType)) {
+      // Not on border - move to closest border entry
+      return this.findClosestBorderEntry(soul);
+    }
+    
+    // Step 2: Soul is on border - move step by step toward target
+    // Check all 4 directions and pick the one that gets closer to target while staying on border
+    const directions = [
+      { x: soulTileX + 1, y: soulTileY, name: 'right' },
+      { x: soulTileX - 1, y: soulTileY, name: 'left' },
+      { x: soulTileX, y: soulTileY + 1, name: 'down' },
+      { x: soulTileX, y: soulTileY - 1, name: 'up' }
+    ];
+    
+    let bestMove = null;
+    let bestDistance = Infinity;
+    
+    for (const dir of directions) {
+      // Check if this move stays on assigned border
+      if (this.isOnAssignedBorderPath(dir.x, dir.y, teamType)) {
+        // Calculate distance to target
+        const distanceToTarget = Math.abs(dir.x - targetTile.tileX) + Math.abs(dir.y - targetTile.tileY);
+        
+        if (distanceToTarget < bestDistance) {
+          bestDistance = distanceToTarget;
+          bestMove = dir;
+        }
+      }
+    }
+    
+    if (bestMove) {
+      return {
+        x: bestMove.x * this.tileMap.tileWidth + this.tileMap.tileWidth / 2,
+        y: bestMove.y * this.tileMap.tileHeight + this.tileMap.tileHeight / 2
+      };
+    }
+    
+    // Fallback - stay in place
+    return {
+      x: soul.x,
+      y: soul.y
+    };
+  }
+
+
+  /**
+   * Find movement target that follows the rectangle border path
+   */
+  findBorderPathMovementTarget(soul) {
+    const teamType = soul.teamType;
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    
+    // Step 1: Check if soul is already on their assigned border path
+    const isOnAssignedBorder = this.isOnAssignedBorderPath(soulTileX, soulTileY, teamType);
+    
+    if (isOnAssignedBorder) {
+      // Step 2: Soul is on border - move along it toward highest scoring area
+      return this.findNextBorderStepTowardHighestScore(soul);
+    } else {
+      // Step 3: Soul is not on border - move to closest point on assigned border
+      return this.findClosestBorderEntry(soul);
+    }
+  }
+  
+  /**
+   * Check if soul is on their team's assigned border path
+   */
+  isOnAssignedBorderPath(x, y, teamType) {
+    // Check if within border rectangle at all
+    if (x < this.borderRect.left || x > this.borderRect.right ||
+        y < this.borderRect.top || y > this.borderRect.bottom) {
+      return false;
+    }
+    
+    // Check if on team's assigned border sides
+    if (teamType === 'green') {
+      const isOnTopBorder = (y <= this.borderRect.top + this.borderWidthY);
+      const isOnLeftBorder = (x <= this.borderRect.left + this.borderWidthX);
+      return isOnTopBorder || isOnLeftBorder;
+    } else {
+      const isOnRightBorder = (x >= this.borderRect.right - this.borderWidthX);
+      const isOnBottomBorder = (y >= this.borderRect.bottom - this.borderWidthY);
+      return isOnRightBorder || isOnBottomBorder;
+    }
+  }
+  
+  /**
+   * Find next step along border toward highest scoring area
+   */
+  findNextBorderStepTowardHighestScore(soul) {
+    const teamType = soul.teamType;
+    
+    // Find the highest scoring tile on the whole map for this team
+    let bestTileX = null, bestTileY = null, bestScore = 0;
+    
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        const score = this.borderScores[teamType][y][x];
+        if (score > bestScore) {
+          bestScore = score;
+          bestTileX = x;
+          bestTileY = y;
+        }
+      }
+    }
+    
+    if (!bestTileX || !bestTileY) {
+      return this.findClosestBorderEntry(soul); // Fallback
+    }
+    
+    // Move along border toward the highest scoring area
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    
+    let targetX = soulTileX;
+    let targetY = soulTileY;
+    
+    if (teamType === 'green') {
+      // Light team follows top and left borders
+      // Move toward the highest scoring tile while staying on assigned borders
+      if (bestTileX < soulTileX && this.isOnAssignedBorderPath(soulTileX - 1, soulTileY, teamType)) {
+        targetX = soulTileX - 1; // Move left along border
+      } else if (bestTileX > soulTileX && this.isOnAssignedBorderPath(soulTileX + 1, soulTileY, teamType)) {
+        targetX = soulTileX + 1; // Move right along border
+      } else if (bestTileY < soulTileY && this.isOnAssignedBorderPath(soulTileX, soulTileY - 1, teamType)) {
+        targetY = soulTileY - 1; // Move up along border
+      } else if (bestTileY > soulTileY && this.isOnAssignedBorderPath(soulTileX, soulTileY + 1, teamType)) {
+        targetY = soulTileY + 1; // Move down along border
+      }
+    } else {
+      // Dark team follows right and bottom borders
+      if (bestTileX < soulTileX && this.isOnAssignedBorderPath(soulTileX - 1, soulTileY, teamType)) {
+        targetX = soulTileX - 1; // Move left along border
+      } else if (bestTileX > soulTileX && this.isOnAssignedBorderPath(soulTileX + 1, soulTileY, teamType)) {
+        targetX = soulTileX + 1; // Move right along border
+      } else if (bestTileY < soulTileY && this.isOnAssignedBorderPath(soulTileX, soulTileY - 1, teamType)) {
+        targetY = soulTileY - 1; // Move up along border
+      } else if (bestTileY > soulTileY && this.isOnAssignedBorderPath(soulTileX, soulTileY + 1, teamType)) {
+        targetY = soulTileY + 1; // Move down along border
+      }
+    }
+    
+    return {
+      x: targetX * this.tileMap.tileWidth + this.tileMap.tileWidth / 2,
+      y: targetY * this.tileMap.tileHeight + this.tileMap.tileHeight / 2
+    };
+  }
+  
+  /**
+   * Find closest entry point to team's assigned border
+   */
+  findClosestBorderEntry(soul) {
+    const teamType = soul.teamType;
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    
+    let targetX, targetY;
+    
+    if (teamType === 'green') {
+      // Light team: move to closest point on top or left border
+      const distToTop = Math.abs(soulTileY - this.borderRect.top);
+      const distToLeft = Math.abs(soulTileX - this.borderRect.left);
+      
+      if (distToTop < distToLeft) {
+        // Move to top border
+        targetX = soulTileX;
+        targetY = this.borderRect.top;
+      } else {
+        // Move to left border
+        targetX = this.borderRect.left;
+        targetY = soulTileY;
+      }
+    } else {
+      // Dark team: move to closest point on right or bottom border
+      const distToBottom = Math.abs(soulTileY - this.borderRect.bottom);
+      const distToRight = Math.abs(soulTileX - this.borderRect.right);
+      
+      if (distToBottom < distToRight) {
+        // Move to bottom border
+        targetX = soulTileX;
+        targetY = this.borderRect.bottom;
+      } else {
+        // Move to right border
+        targetX = this.borderRect.right;
+        targetY = soulTileY;
+      }
+    }
+    
+    // Ensure target is within map bounds
+    targetX = Math.max(0, Math.min(this.tileMap.width - 1, targetX));
+    targetY = Math.max(0, Math.min(this.tileMap.height - 1, targetY));
+    
+    return {
+      x: targetX * this.tileMap.tileWidth + this.tileMap.tileWidth / 2,
+      y: targetY * this.tileMap.tileHeight + this.tileMap.tileHeight / 2
+    };
   }
 
   /**
@@ -620,83 +869,115 @@ class MovementSystem {
   }
 
   /**
-   * Calculate Manhattan distances from ALL tiles to enemy nexuses
+   * Calculate border-based scoring system for team-specific pathfinding
    */
-  calculateManhattanDistances() {
+  calculateBorderScoring() {
+    const width = this.tileMap.width;
+    const height = this.tileMap.height;
+    const borderWidth = GameConfig.NEXUS.BORDER_WIDTH;
+    
+    // Define border rectangle with nexuses on opposite corners
+    const lightNexus = GameConfig.NEXUS.LIGHT_NEXUS;  // Bottom-left nexus
+    const darkNexus = GameConfig.NEXUS.DARK_NEXUS;    // Top-right nexus
+    
+    // Calculate border width based on 100 pixels divided by tile dimensions
+    const borderWidthX = Math.ceil(100 / this.tileMap.tileWidth);  // Horizontal border width in tiles
+    const borderWidthY = Math.ceil(100 / this.tileMap.tileHeight); // Vertical border width in tiles
+    
+    // Create rectangle with nexuses sitting in the MIDDLE of the border width
+    const halfBorderX = Math.floor(borderWidthX / 2);
+    const halfBorderY = Math.floor(borderWidthY / 2);
+    
+    this.borderRect = {
+      left: lightNexus.TILE_X - halfBorderX,     // Light nexus in middle of left border
+      top: darkNexus.TILE_Y - halfBorderY,      // Dark nexus in middle of top border
+      right: darkNexus.TILE_X + halfBorderX,    // Dark nexus in middle of right border
+      bottom: lightNexus.TILE_Y + halfBorderY   // Light nexus in middle of bottom border
+    };
+    
+    // Store border dimensions for later use
+    this.borderWidthX = borderWidthX;
+    this.borderWidthY = borderWidthY;
+    
+    // Initialize arrays
+    this.borderScores.green = Array(height).fill(null).map(() => Array(width).fill(0));
+    this.borderScores.gray = Array(height).fill(null).map(() => Array(width).fill(0));
+    
+    // Calculate scores for each tile
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        this.borderScores.green[y][x] = this.calculateTileScore(x, y, 'green');
+        this.borderScores.gray[y][x] = this.calculateTileScore(x, y, 'gray');
+      }
+    }
+  }
+  
+  /**
+   * Calculate score for a specific tile based on team rules
+   */
+  calculateTileScore(x, y, teamType) {
+    // Outside border rectangle = 0 score
+    if (x < this.borderRect.left || x > this.borderRect.right ||
+        y < this.borderRect.top || y > this.borderRect.bottom) {
+      return 0;
+    }
+    
+    // Check if tile is owned by this team (0 score if owned)
+    const tile = this.tileMap.tiles[y] && this.tileMap.tiles[y][x];
+    if (tile && tile.type === teamType) {
+      return 0;
+    }
+    
+    // Team-specific border restrictions
+    if (teamType === 'green') {
+      // Light team: ONLY top and left sides of rectangle
+      const isOnTopSide = (y <= this.borderRect.top + this.borderWidthY);
+      const isOnLeftSide = (x <= this.borderRect.left + this.borderWidthX);
+      
+      if (!isOnTopSide && !isOnLeftSide) {
+        return 0; // Not on light team's assigned sides
+      }
+    } else {
+      // Dark team: ONLY right and bottom sides of rectangle  
+      const isOnRightSide = (x >= this.borderRect.right - this.borderWidthX);
+      const isOnBottomSide = (y >= this.borderRect.bottom - this.borderWidthY);
+      
+      if (!isOnRightSide && !isOnBottomSide) {
+        return 0; // Not on dark team's assigned sides
+      }
+    }
+    
+    // Calculate Manhattan distance to enemy nexus
+    const enemyNexus = teamType === 'green' ? GameConfig.NEXUS.DARK_NEXUS : GameConfig.NEXUS.LIGHT_NEXUS;
+    const manhattanDistance = Math.abs(x - enemyNexus.TILE_X) + Math.abs(y - enemyNexus.TILE_Y);
+    
+    // Return Manhattan distance directly as score
+    // Tiles NEAR enemy nexus have LOW scores, tiles FAR from enemy nexus have HIGH scores
+    // Souls seek HIGHEST scores, so they'll prioritize tiles far from enemy nexus (closer to their own base)
+    return manhattanDistance;
+  }
+  
+  /**
+   * Update border scores when a spell is successfully cast
+   */
+  updateBorderScores() {
+    // Recalculate all scores since tile ownership changed
     const width = this.tileMap.width;
     const height = this.tileMap.height;
     
-    // Initialize arrays
-    this.manhattanScores.green = Array(height).fill(null).map(() => Array(width).fill(0));
-    this.manhattanScores.gray = Array(height).fill(null).map(() => Array(width).fill(0));
-    
-    // Calculate Manhattan distance from every tile to enemy nexus
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        // Green team targets dark nexus
-        this.manhattanScores.green[y][x] = Math.abs(x - GameConfig.NEXUS.DARK_NEXUS.TILE_X) + 
-                                          Math.abs(y - GameConfig.NEXUS.DARK_NEXUS.TILE_Y);
-        
-        // Gray team targets light nexus  
-        this.manhattanScores.gray[y][x] = Math.abs(x - GameConfig.NEXUS.LIGHT_NEXUS.TILE_X) + 
-                                         Math.abs(y - GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y);
+        this.borderScores.green[y][x] = this.calculateTileScore(x, y, 'green');
+        this.borderScores.gray[y][x] = this.calculateTileScore(x, y, 'gray');
       }
     }
   }
 
 
-  /**
-   * Calculate the L-shaped tunnel path 
-   * Dark souls: DOWN then LEFT
-   * Light souls: UP then RIGHT
-   */
-  calculateTunnelPath(startX, startY, endX, endY) {
-    const tunnelTiles = new Set();
-    const tunnelWidth = GameConfig.NEXUS.TUNNEL_WIDTH;
-    const halfWidth = Math.floor(tunnelWidth / 2);
-    
-    // Create L-shaped path: vertical first, then horizontal
-    
-    // 1. VERTICAL PATH (DOWN for dark, UP for light)
-    const verticalStart = Math.min(startY, endY);
-    const verticalEnd = Math.max(startY, endY);
-    
-    for (let y = verticalStart; y <= verticalEnd; y++) {
-      for (let offsetX = -halfWidth; offsetX <= halfWidth; offsetX++) {
-        const tileX = startX + offsetX;
-        const tileY = y;
-        if (tileX >= 0 && tileX < this.tileMap.width && 
-            tileY >= 0 && tileY < this.tileMap.height) {
-          tunnelTiles.add(`${tileX},${tileY}`);
-        }
-      }
-    }
-    
-    // 2. HORIZONTAL PATH (LEFT for dark, RIGHT for light)
-    const horizontalStart = Math.min(startX, endX);
-    const horizontalEnd = Math.max(startX, endX);
-    
-    for (let x = horizontalStart; x <= horizontalEnd; x++) {
-      for (let offsetY = -halfWidth; offsetY <= halfWidth; offsetY++) {
-        const tileX = x;
-        const tileY = endY + offsetY;
-        if (tileX >= 0 && tileX < this.tileMap.width && 
-            tileY >= 0 && tileY < this.tileMap.height) {
-          tunnelTiles.add(`${tileX},${tileY}`);
-        }
-      }
-    }
-    
-    return tunnelTiles;
-  }
-
-  /**
-   * Check if a tile is on the tunnel path
-   */
-  isTileOnTunnelPath(x, y, tunnelTiles) {
-    return tunnelTiles.has(`${x},${y}`);
-  }
 
 }
 
 module.exports = MovementSystem;
+
+
+
