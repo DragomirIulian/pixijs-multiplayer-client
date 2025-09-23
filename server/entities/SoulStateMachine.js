@@ -13,15 +13,17 @@ const SoulStates = {
   CASTING: 'casting',
   DEFENDING: 'defending',  // Moving toward enemy to attack
   ATTACKING: 'attacking',  // Stopped and attacking
+  ATTACKING_NEXUS: 'attacking_nexus', // Moving toward and attacking enemy nexus
   SOCIALISING: 'socialising',
   RESTING: 'resting',
   MATING: 'mating'
 };
 
 class SoulStateMachine {
-  constructor(soul, tileMap = null) {
+  constructor(soul, tileMap = null, movementSystem = null) {
     this.soul = soul;
     this.tileMap = tileMap;
+    this.movementSystem = movementSystem;
     this.currentState = SoulStates.ROAMING;
     this.stateStartTime = Date.now();
     this.lastCastTime = Date.now();
@@ -70,6 +72,10 @@ class SoulStateMachine {
         
       case SoulStates.SEEKING:
         this.handleSeekingState(energyPercentage, allSouls);
+        break;
+
+      case SoulStates.ATTACKING_NEXUS:
+        this.handleAttackingNexusState(energyPercentage, allSouls);
         break;
         
       case SoulStates.PREPARING:
@@ -130,6 +136,12 @@ class SoulStateMachine {
     // Only one soul should defend per casting enemy
     if (this.shouldBeDefender(allSouls)) {
       this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
+
+    // Check if should attack enemy nexus (high priority - when close and healthy)
+    if (this.shouldAttackNexus(energyPercentage, allSouls)) {
+      this.transitionTo(SoulStates.ATTACKING_NEXUS);
       return;
     }
 
@@ -374,35 +386,21 @@ class SoulStateMachine {
   }
 
   findNearestEnemyTileDistance() {
-    if (!this.tileMap) {
-      // If no tileMap, souls should not try to cast - return very large distance
+    if (!this.movementSystem) {
       return Infinity;
     }
 
-    const opponentTileType = this.soul.type === 'dark-soul' ? 'green' : 'gray';
-    let nearestDistance = Infinity;
-
-    // Check distance to nearest enemy tile
-    for (let y = 0; y < this.tileMap.height; y++) {
-      for (let x = 0; x < this.tileMap.width; x++) {
-        const tile = this.tileMap.tiles[y][x];
-
-        if (tile.type === opponentTileType) {
-          const tileWorldX = tile.worldX + this.tileMap.tileWidth / 2;
-          const tileWorldY = tile.worldY + this.tileMap.tileHeight / 2;
-          
-          const dx = tileWorldX - this.soul.x;
-          const dy = tileWorldY - this.soul.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < nearestDistance) {
-            nearestDistance = distance;
-          }
-        }
-      }
+    // Use MovementSystem's logic to find the BEST enemy tile
+    const bestTile = this.movementSystem.findNearestEnemyTile(this.soul);
+    
+    if (!bestTile) {
+      return Infinity;
     }
 
-    return nearestDistance;
+    // Return distance to the BEST tile
+    const dx = bestTile.x - this.soul.x;
+    const dy = bestTile.y - this.soul.y;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   transitionTo(newState) {
@@ -416,6 +414,13 @@ class SoulStateMachine {
     // Reset state-specific flags
     if (newState !== SoulStates.DEFENDING) {
       this.defendingTarget = null;
+    }
+    
+    // Clear prepare target when leaving preparation or casting states
+    if (this.previousState === SoulStates.PREPARING || this.previousState === SoulStates.CASTING) {
+      if (newState !== SoulStates.PREPARING && newState !== SoulStates.CASTING) {
+        this.soul.prepareTarget = null;
+      }
     }
 
     // Update soul properties based on new state
@@ -533,6 +538,105 @@ class SoulStateMachine {
       const distanceToClosest = this.soul.getDistanceTo(closest);
       return distanceToSoul < distanceToClosest ? soul : closest;
     });
+  }
+
+  /**
+   * Check if soul should attack enemy nexus
+   */
+  shouldAttackNexus(energyPercentage, allSouls) {
+    // Check if there's a path to enemy nexus
+    const enemyNexusPos = this.soul.type === 'dark-soul' ? 
+      GameConfig.NEXUS.LIGHT_NEXUS : GameConfig.NEXUS.DARK_NEXUS;
+    
+    const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
+    const nexusWorldY = enemyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
+    
+    // Only attack if there's a clear path to nexus (can reach within soul height limit)
+    return this.hasPathToNexus(nexusWorldX, nexusWorldY);
+  }
+
+  /**
+   * Handle ATTACKING_NEXUS state behavior
+   */
+  handleAttackingNexusState(energyPercentage, allSouls) {
+    // Switch to hungry if energy is too low
+    if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
+      this.transitionTo(SoulStates.HUNGRY);
+      return;
+    }
+
+    // Check if should defend (overrides nexus attacking)
+    if (this.shouldBeDefender(allSouls)) {
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
+
+    // Souls engage in attacking until they die - no retreat once attacking nexus
+    // They will continue attacking or move towards nexus until eliminated
+  }
+
+  /**
+   * Check if there's a path to enemy nexus within soul height limit (10 tiles)
+   */
+  hasPathToNexus(nexusWorldX, nexusWorldY) {
+    if (!this.tileMap) return false;
+
+    // Convert soul position to tile coordinates
+    const soulTileX = Math.floor(this.soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(this.soul.y / this.tileMap.tileHeight);
+    
+    // Convert nexus position to tile coordinates
+    const nexusTileX = Math.floor(nexusWorldX / this.tileMap.tileWidth);
+    const nexusTileY = Math.floor(nexusWorldY / this.tileMap.tileHeight);
+    
+    // Simple path check: see if we can reach nexus through friendly territory
+    // within the height limit (souls are 5 tiles height, path should be 10 tiles)
+    const maxDistance = GameConfig.NEXUS.MAX_ATTACK_DISTANCE;
+    
+    // Calculate straight-line distance
+    const dx = Math.abs(nexusTileX - soulTileX);
+    const dy = Math.abs(nexusTileY - soulTileY);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // If nexus is within reachable distance and we have a clear path through friendly tiles
+    if (distance <= maxDistance) {
+      return this.hasLinearPathThroughFriendlyTerritory(soulTileX, soulTileY, nexusTileX, nexusTileY);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if there's a straight path through friendly territory to target
+   */
+  hasLinearPathThroughFriendlyTerritory(startX, startY, endX, endY) {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const steps = Math.max(Math.abs(dx), Math.abs(dy));
+    
+    if (steps === 0) return true;
+    
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    
+    // Check each step along the path
+    for (let i = 0; i <= steps; i++) {
+      const checkX = Math.round(startX + stepX * i);
+      const checkY = Math.round(startY + stepY * i);
+      
+      // Check bounds
+      if (checkX < 0 || checkX >= this.tileMap.width || 
+          checkY < 0 || checkY >= this.tileMap.height) {
+        return false;
+      }
+      
+      const tile = this.tileMap.tiles[checkY][checkX];
+      if (tile.type !== this.soul.teamType) {
+        return false; // Path blocked by enemy territory
+      }
+    }
+    
+    return true; // Clear path through friendly territory
   }
 }
 

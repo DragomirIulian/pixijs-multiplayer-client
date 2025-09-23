@@ -6,7 +6,7 @@ const { SoulStateMachine, SoulStates } = require('./SoulStateMachine');
  * Encapsulates all soul behavior and properties
  */
 class Soul {
-  constructor(id, type, x, y, tileMap = null, isChild = false) {
+  constructor(id, type, x, y, tileMap = null, isChild = false, movementSystem = null) {
     this.id = id;
     this.name = `${type === 'dark-soul' ? 'Dark' : 'Light'} Soul`;
     this.type = type;
@@ -47,7 +47,7 @@ class Soul {
     this.readyToCompleteMating = false;
     
     // State machine
-    this.stateMachine = new SoulStateMachine(this, tileMap);
+    this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem);
   }
 
   update(allSouls) {
@@ -127,7 +127,8 @@ class Soul {
 
   // Spell casting methods
   canCast() {
-    return this.isAdult() &&  // Children cannot cast spells
+    return !this.isDead &&     // Dead souls cannot cast spells
+           this.isAdult() &&    // Children cannot cast spells
            this.energy >= GameConfig.SOUL.MIN_ENERGY_TO_CAST &&
            Date.now() - this.stateMachine.lastCastTime > GameConfig.SOUL.SPELL_COOLDOWN;
   }

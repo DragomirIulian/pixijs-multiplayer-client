@@ -6,9 +6,10 @@ const { SoulStates } = require('../entities/SoulStateMachine');
  * Handles combat interactions between souls
  */
 class CombatSystem {
-  constructor(spellSystem = null) {
+  constructor(spellSystem = null, gameManager = null) {
     this.attackEvents = [];
     this.spellSystem = spellSystem;
+    this.gameManager = gameManager; // Need access to nexuses
   }
 
   update(allSouls) {
@@ -22,6 +23,17 @@ class CombatSystem {
   }
 
   processSoulCombat(soul, allSouls) {
+    // Skip dead souls - they can't attack
+    if (soul.isDead) {
+      return;
+    }
+
+    // Check for nexus attack first (highest priority for ATTACKING_NEXUS souls)
+    if (soul.stateMachine.getCurrentState() === 'attacking_nexus') {
+      this.processNexusAttack(soul);
+      return;
+    }
+
     // Only attack when defending against an enemy that is casting
     if (!soul.isDefending || !soul.defendingTarget) {
       return;
@@ -121,6 +133,61 @@ class CombatSystem {
 
   clearEvents() {
     this.attackEvents = [];
+  }
+
+  /**
+   * Process nexus attack for souls in ATTACKING_NEXUS state
+   */
+  processNexusAttack(soul) {
+    // Skip dead souls - they can't attack
+    if (soul.isDead) {
+      return;
+    }
+
+    if (!this.gameManager || !this.gameManager.nexuses) return;
+
+    // Get enemy nexus
+    const enemyNexusType = soul.type === 'dark-soul' ? 'light' : 'dark';
+    const enemyNexus = this.gameManager.nexuses.get(enemyNexusType);
+    
+    if (!enemyNexus || enemyNexus.isDestroyed) return;
+
+    // Check if soul is close enough to attack nexus
+    const distance = soul.getDistanceTo({ x: enemyNexus.x, y: enemyNexus.y });
+    
+    if (distance <= GameConfig.SOUL.ATTACK_RANGE && soul.canAttack()) {
+      // Calculate damage (similar to soul attack but reduced)
+      const damage = Math.floor(Math.random() * (GameConfig.SOUL.ATTACK_DAMAGE_MAX - GameConfig.SOUL.ATTACK_DAMAGE_MIN + 1)) + GameConfig.SOUL.ATTACK_DAMAGE_MIN;
+      
+      // Apply damage to nexus
+      const wasDestroyed = enemyNexus.takeDamage(damage);
+      
+      // Update soul's last attack time
+      soul.lastAttackTime = Date.now();
+      
+      // Record nexus attack event for broadcasting
+      this.attackEvents.push({
+        type: 'nexus_attack',
+        attackerId: soul.id,
+        nexusId: enemyNexus.id,
+        damage: damage,
+        attackerPos: { x: soul.x, y: soul.y },
+        nexusPos: { x: enemyNexus.x, y: enemyNexus.y },
+        wasDestroyed: wasDestroyed,
+        nexusHealth: enemyNexus.currentHealth
+      });
+      
+      // If nexus was destroyed, trigger victory condition
+      if (wasDestroyed) {
+        this.attackEvents.push({
+          type: 'nexus_destroyed',
+          nexusId: enemyNexus.id,
+          nexusType: enemyNexusType,
+          destroyedBy: soul.id,
+          destroyedByTeam: soul.teamType
+        });
+      }
+    }
   }
 }
 

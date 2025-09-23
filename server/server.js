@@ -28,11 +28,6 @@ function gameLoop() {
   
   // Broadcast all events
   events.forEach(event => {
-    // Handle spell completion specially (removes caster)
-    if (event.type === 'spell_completed') {
-      gameManager.handleSpellCompletion(event);
-    }
-    
     broadcastToAll(event);
   });
   
@@ -66,6 +61,7 @@ function broadcastWorldState() {
     type: 'world_state',
     characters: gameManager.getSouls(),
     energyOrbs: gameManager.getEnergyOrbs(),
+    nexuses: gameManager.getNexuses(),
     tileMap: gameManager.getTileMap(),
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),
@@ -80,6 +76,7 @@ wss.on('connection', (ws) => {
     type: 'world_state',
     characters: gameManager.getSouls(),
     energyOrbs: gameManager.getEnergyOrbs(),
+    nexuses: gameManager.getNexuses(),
     tileMap: gameManager.getTileMap(),
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),

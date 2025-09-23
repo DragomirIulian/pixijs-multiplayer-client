@@ -43,7 +43,7 @@ const GameConfig = {
      ATTACK_DAMAGE_MAX: 25,
     
     // Spell configuration
-    SPELL_COOLDOWN: 20000,      // 20 seconds
+    SPELL_COOLDOWN: 5000,      // 20 seconds
     SPELL_RANGE: 100,
     SPELL_CAST_TIME: 3000,      // 5 seconds
     SPELL_PREPARATION_TIME: 1000, // 1 second
@@ -81,7 +81,7 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 10,
+    SOULS_PER_TEAM: 1,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
@@ -101,7 +101,7 @@ const GameConfig = {
 
   // Mating and reproduction configuration
   MATING: {
-    MIN_RESTING_SOULS: 5,       // Minimum souls per team to avoid extinction
+    MIN_RESTING_SOULS: 0,       // Minimum souls per team to avoid extinction
     MAX_SOULS_PER_TEAM: 10,      // Maximum souls per team
     MIN_ENERGY_FOR_MATING: 0.5, // 30% energy required to mate (reduced for testing)
     MATING_RANGE: 120,          // Distance souls need to be for mating (increased)
@@ -131,6 +131,30 @@ const GameConfig = {
     DAY_AMBIENT_LIGHT: 1.0,     // Full brightness during day
     NIGHT_AMBIENT_LIGHT: 0.3,   // 30% brightness during night
     TRANSITION_SPEED: 0.05      // How fast lighting transitions
+  },
+
+  // Nexus configuration
+  NEXUS: {
+    MAX_HEALTH: 1000,           // Maximum health for each nexus
+    HEALTH_REGENERATION: 5,     // Health points regenerated per second
+    REGENERATION_INTERVAL: 1000, // How often to regenerate health (ms)
+    DESTRUCTION_DAMAGE: 100,     // Damage dealt when nexus is destroyed
+    SPAWN_OFFSET_RANGE: 25,     // Random offset range for spawning around nexus
+    
+    // Positions (in tile coordinates)
+    LIGHT_NEXUS: {
+      TILE_X: 5,                // Left bottom corner
+      TILE_Y: 45
+    },
+    DARK_NEXUS: {
+      TILE_X: 54,               // Right top corner  
+      TILE_Y: 5
+    },
+
+    // Combat and pathfinding
+    TUNNEL_WIDTH: 10,           // 10 tiles wide as requested (soul height limit)
+    TUNNEL_PRIORITY_MULTIPLIER: 2.0,  // How much to prioritize tunnel tiles
+    MAX_ATTACK_DISTANCE: 10     // Maximum distance to consider for nexus attack
   }
 };
 

@@ -25,7 +25,8 @@ export class SpellManager {
         
         // Create transformation effect container
         const transformEffect = new Graphics();
-        transformEffect.spellId = spellData.id;
+        transformEffect.spellId = spellData.spellId;
+        transformEffect.casterId = spellData.casterId; // Add missing casterId property
         transformEffect.startTime = Date.now();
         transformEffect.duration = spellData.duration;
         transformEffect.casterType = spellData.casterType;
@@ -40,6 +41,18 @@ export class SpellManager {
     }
 
     handleSpellStarted(spellData, gameMap) {
+        if (!spellData.spellId) {
+            console.error('[SpellManager] Received spell with undefined spellId:', spellData);
+            return;
+        }
+        
+        // Prevent duplicate spell creation
+        if (this.activeSpells.has(spellData.spellId)) {
+            console.log(`[SpellManager] Spell ${spellData.spellId} already exists, skipping duplicate creation`);
+            return;
+        }
+        
+        console.log(`[SpellManager] Spell started: ${spellData.spellId}, duration: ${spellData.duration}ms at ${Date.now()}`);
         
         // Create tether animation between caster and target tile
         const tether = new Graphics();
@@ -59,17 +72,29 @@ export class SpellManager {
     }
 
     handleSpellCompleted(data) {
+        console.log(`[SpellManager] Spell completed: ${data.spellId} at ${Date.now()}`);
         // Remove the tether animation
+        console.log(`[SpellManager] active spells:`, Array.from(this.activeSpells.keys()));
         const tether = this.activeSpells.get(data.spellId);
         if (tether) {
+            const elapsed = Date.now() - tether.startTime;
+            console.log(`[SpellManager] Tether ${data.spellId} lived for ${elapsed}ms (expected: ${tether.spellData.duration}ms), started at ${tether.startTime}, completed at ${Date.now()}`);
+            // Immediately stop rendering and remove from stage FIRST
+            tether.forceCompleted = true;
             this.app.stage.removeChild(tether);
+            tether.clear();
             this.activeSpells.delete(data.spellId);
+            console.log(`[SpellManager] active spells after:`, Array.from(this.activeSpells.keys()));
+
         }
         
         // Remove the tile transformation effect
         const transformEffect = this.tileTransformEffects.get(data.spellId);
         if (transformEffect) {
+            // Immediately stop rendering and remove from stage FIRST
+            transformEffect.forceCompleted = true;
             this.app.stage.removeChild(transformEffect);
+            transformEffect.clear();
             this.tileTransformEffects.delete(data.spellId);
         }
         
@@ -174,15 +199,63 @@ export class SpellManager {
         }
     }
 
+    clearSpellsByCaster(casterId) {
+        // Clear all spells cast by this caster immediately
+        const spellsToRemove = [];
+        this.activeSpells.forEach((tether, spellId) => {
+            if (tether.spellData && tether.spellData.casterId === casterId) {
+                spellsToRemove.push(spellId);
+                // Force the tether to stop rendering immediately by marking it as completed
+                tether.forceCompleted = true;
+                tether.clear(); // Clear graphics immediately
+            }
+        });
+        
+        spellsToRemove.forEach(spellId => {
+            const tether = this.activeSpells.get(spellId);
+            if (tether && tether.parent) {
+                tether.parent.removeChild(tether);
+            }
+            this.activeSpells.delete(spellId);
+        });
+
+        // Also clear tile effects by this caster
+        const effectsToRemove = [];
+        this.tileTransformEffects.forEach((effect, spellId) => {
+            if (effect.casterId === casterId) {
+                effectsToRemove.push(spellId);
+                // Force the effect to stop rendering immediately
+                effect.forceCompleted = true;
+                effect.clear(); // Clear graphics immediately
+            }
+        });
+        
+        effectsToRemove.forEach(spellId => {
+            const effect = this.tileTransformEffects.get(spellId);
+            if (effect && effect.parent) {
+                effect.parent.removeChild(effect);
+            }
+            this.tileTransformEffects.delete(spellId);
+        });
+        
+        console.log(`[SpellManager] Cleared ${spellsToRemove.length} spells and ${effectsToRemove.length} effects for caster ${casterId} at ${Date.now()}`);
+    }
+
     updateSpells(time, effectsSystem) {
-        // Update spell tethers
-        this.activeSpells.forEach(tether => {
-            effectsSystem.updateSpellTether(tether, time);
+        // Update spell tethers - use Array.from to avoid stale iterations
+        Array.from(this.activeSpells.entries()).forEach(([spellId, tether]) => {
+            // Double-check the spell still exists before updating
+            if (this.activeSpells.has(spellId)) {
+                effectsSystem.updateSpellTether(tether, time);
+            }
         });
 
         // Update tile transformation effects
-        this.tileTransformEffects.forEach(effect => {
-            effectsSystem.updateTileTransformEffect(effect, time);
+        Array.from(this.tileTransformEffects.entries()).forEach(([spellId, effect]) => {
+            // Double-check the effect still exists before updating
+            if (this.tileTransformEffects.has(spellId)) {
+                effectsSystem.updateTileTransformEffect(effect, time);
+            }
         });
     }
 }

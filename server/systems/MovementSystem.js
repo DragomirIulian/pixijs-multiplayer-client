@@ -8,6 +8,14 @@ const { SoulStates } = require('../entities/SoulStateMachine');
 class MovementSystem {
   constructor(tileMap) {
     this.tileMap = tileMap;
+    
+    // Manhattan distance from each tile to enemy nexus
+    this.manhattanScores = {
+      green: [], // Distance from each tile to dark nexus (green team's target)
+      gray: []   // Distance from each tile to light nexus (gray team's target)
+    };
+    
+    this.calculateManhattanDistances();
   }
 
   updateSoul(soul, allSouls, energyOrbs, movementMultiplier = 1.0) {
@@ -67,7 +75,16 @@ class MovementSystem {
 
       case SoulStates.SEEKING:
         moveTarget = this.findNearestEnemyTile(soul);
+        if (!moveTarget) {
+          // If no enemy tiles to capture, move toward enemy nexus
+          moveTarget = this.getNexusTarget(soul);
+        }
         movementType = 'seek';
+        break;
+
+      case SoulStates.ATTACKING_NEXUS:
+        moveTarget = this.getNexusTarget(soul);
+        movementType = 'nexus_attack';
         break;
 
       case SoulStates.ROAMING:
@@ -177,36 +194,68 @@ class MovementSystem {
   }
 
   findNearestEnemyTile(soul) {
-    if (!this.tileMap) return null;
+    if (!this.tileMap || !soul) return null;
 
-    const opponentTileType = soul.type === 'dark-soul' ? 'green' : 'gray';
-    
-    let nearestTile = null;
-    let nearestDistance = GameConfig.SOUL.SEARCH_RADIUS;
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    const teamType = soul.teamType;
+    const opponentType = soul.type === 'dark-soul' ? 'green' : 'gray';
 
-    // Check all tiles to find nearest enemy tile
+    // Find the enemy tile with LOWEST Manhattan score that has a friendly tile next to it
+    let bestTile = null;
+    let bestManhattanScore = Infinity;
+
+    // Check ALL tiles on the map
     for (let y = 0; y < this.tileMap.height; y++) {
       for (let x = 0; x < this.tileMap.width; x++) {
         const tile = this.tileMap.tiles[y][x];
-
-        // Only target opponent tiles
-        if (tile.type === opponentTileType) {
-          const tileWorldX = tile.worldX + this.tileMap.tileWidth / 2;
-          const tileWorldY = tile.worldY + this.tileMap.tileHeight / 2;
+        
+        // Only consider enemy tiles
+        if (tile && tile.type === opponentType) {
+          // Check if this enemy tile has at least one friendly tile next to it
+          const hasFriendlyNeighbor = this.hasAdjacentFriendlyTile(x, y, teamType);
           
-          const dx = tileWorldX - soul.x;
-          const dy = tileWorldY - soul.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestTile = { x: tileWorldX, y: tileWorldY };
+          if (hasFriendlyNeighbor) {
+            // Get Manhattan score for this tile
+            const manhattanScore = this.manhattanScores[teamType][y][x];
+            
+            // Pick the tile with lowest Manhattan score (closest to enemy nexus)
+            if (manhattanScore < bestManhattanScore) {
+              bestManhattanScore = manhattanScore;
+              bestTile = {
+                x: tile.worldX + this.tileMap.tileWidth / 2,
+                y: tile.worldY + this.tileMap.tileHeight / 2
+              };
+            }
           }
         }
       }
     }
 
-    return nearestTile;
+    return bestTile;
+  }
+
+  /**
+   * Check if a tile has adjacent friendly tiles
+   */
+  hasAdjacentFriendlyTile(tileX, tileY, teamType) {
+    const adjacentOffsets = [
+      [-1, 0], [1, 0], [0, -1], [0, 1] // left, right, up, down
+    ];
+    
+    for (const [dx, dy] of adjacentOffsets) {
+      const checkX = tileX + dx;
+      const checkY = tileY + dy;
+      
+      if (checkX >= 0 && checkX < this.tileMap.width && 
+          checkY >= 0 && checkY < this.tileMap.height) {
+        const adjacentTile = this.tileMap.tiles[checkY][checkX];
+        if (adjacentTile && adjacentTile.type === teamType) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   isCloseEnoughToAttack(soul, target) {
@@ -554,6 +603,100 @@ class MovementSystem {
       );
     }
   }
+
+  /**
+   * Get enemy nexus position as movement target
+   */
+  getNexusTarget(soul) {
+    if (!this.tileMap) return null;
+    
+    const enemyNexusPos = soul.type === 'dark-soul' ? 
+      GameConfig.NEXUS.LIGHT_NEXUS : GameConfig.NEXUS.DARK_NEXUS;
+    
+    const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
+    const nexusWorldY = enemyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
+    
+    return { x: nexusWorldX, y: nexusWorldY };
+  }
+
+  /**
+   * Calculate Manhattan distances from ALL tiles to enemy nexuses
+   */
+  calculateManhattanDistances() {
+    const width = this.tileMap.width;
+    const height = this.tileMap.height;
+    
+    // Initialize arrays
+    this.manhattanScores.green = Array(height).fill(null).map(() => Array(width).fill(0));
+    this.manhattanScores.gray = Array(height).fill(null).map(() => Array(width).fill(0));
+    
+    // Calculate Manhattan distance from every tile to enemy nexus
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Green team targets dark nexus
+        this.manhattanScores.green[y][x] = Math.abs(x - GameConfig.NEXUS.DARK_NEXUS.TILE_X) + 
+                                          Math.abs(y - GameConfig.NEXUS.DARK_NEXUS.TILE_Y);
+        
+        // Gray team targets light nexus  
+        this.manhattanScores.gray[y][x] = Math.abs(x - GameConfig.NEXUS.LIGHT_NEXUS.TILE_X) + 
+                                         Math.abs(y - GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y);
+      }
+    }
+  }
+
+
+  /**
+   * Calculate the L-shaped tunnel path 
+   * Dark souls: DOWN then LEFT
+   * Light souls: UP then RIGHT
+   */
+  calculateTunnelPath(startX, startY, endX, endY) {
+    const tunnelTiles = new Set();
+    const tunnelWidth = GameConfig.NEXUS.TUNNEL_WIDTH;
+    const halfWidth = Math.floor(tunnelWidth / 2);
+    
+    // Create L-shaped path: vertical first, then horizontal
+    
+    // 1. VERTICAL PATH (DOWN for dark, UP for light)
+    const verticalStart = Math.min(startY, endY);
+    const verticalEnd = Math.max(startY, endY);
+    
+    for (let y = verticalStart; y <= verticalEnd; y++) {
+      for (let offsetX = -halfWidth; offsetX <= halfWidth; offsetX++) {
+        const tileX = startX + offsetX;
+        const tileY = y;
+        if (tileX >= 0 && tileX < this.tileMap.width && 
+            tileY >= 0 && tileY < this.tileMap.height) {
+          tunnelTiles.add(`${tileX},${tileY}`);
+        }
+      }
+    }
+    
+    // 2. HORIZONTAL PATH (LEFT for dark, RIGHT for light)
+    const horizontalStart = Math.min(startX, endX);
+    const horizontalEnd = Math.max(startX, endX);
+    
+    for (let x = horizontalStart; x <= horizontalEnd; x++) {
+      for (let offsetY = -halfWidth; offsetY <= halfWidth; offsetY++) {
+        const tileX = x;
+        const tileY = endY + offsetY;
+        if (tileX >= 0 && tileX < this.tileMap.width && 
+            tileY >= 0 && tileY < this.tileMap.height) {
+          tunnelTiles.add(`${tileX},${tileY}`);
+        }
+      }
+    }
+    
+    return tunnelTiles;
+  }
+
+  /**
+   * Check if a tile is on the tunnel path
+   */
+  isTileOnTunnelPath(x, y, tunnelTiles) {
+    return tunnelTiles.has(`${x},${y}`);
+  }
+
 }
 
 module.exports = MovementSystem;

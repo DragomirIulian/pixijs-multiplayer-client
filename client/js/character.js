@@ -60,6 +60,7 @@ export class Character {
         this.sprite.anchor.set(0.5);
         this.sprite.x = this.x;
         this.sprite.y = this.y;
+        this.sprite.zIndex = 10; // Ensure characters render above nexus platforms
         
         // Set initial scale based on maturity
         this.updateScale();

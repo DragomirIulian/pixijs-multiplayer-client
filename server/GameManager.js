@@ -1,5 +1,6 @@
 const GameConfig = require('./config/gameConfig');
 const Soul = require('./entities/Soul');
+const Nexus = require('./entities/Nexus');
 const MovementSystem = require('./systems/MovementSystem');
 const CombatSystem = require('./systems/CombatSystem');
 const SpellSystem = require('./systems/SpellSystem');
@@ -15,6 +16,7 @@ class GameManager {
   constructor() {
     this.souls = new Map();
     this.energyOrbs = new Map();
+    this.nexuses = new Map(); // Store nexus entities
     this.tileMap = null;
     // Initialize systems
     this.movementSystem = null; // Will be initialized after tileMap
@@ -28,6 +30,7 @@ class GameManager {
     this.gameEvents = [];
     
     this.initializeTileMap();
+    this.initializeNexuses();
     this.initializeSystems();
     this.spawnInitialSouls();
     this.spawnInitialOrbs();
@@ -66,32 +69,43 @@ class GameManager {
     };
   }
 
+  initializeNexuses() {
+    // Create light nexus (bottom left)
+    const lightNexus = new Nexus('light', this.tileMap);
+    this.nexuses.set('light', lightNexus);
+    
+    // Create dark nexus (top right)
+    const darkNexus = new Nexus('dark', this.tileMap);
+    this.nexuses.set('dark', darkNexus);
+  }
+
   initializeSystems() {
     this.dayNightSystem = new DayNightSystem();
     this.movementSystem = new MovementSystem(this.tileMap);
     this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem);
-    this.combatSystem = new CombatSystem(this.spellSystem);
+    this.combatSystem = new CombatSystem(this.spellSystem, this);
     this.matingSystem = new MatingSystem(this);
     this.statisticsManager = new StatisticsManager();
     this.statisticsManager.initialize(this);
   }
 
   spawnInitialSouls() {
-    // Spawn souls for each team
+    // Spawn souls for each team at their respective nexuses
     for (let i = 0; i < GameConfig.SPAWN.SOULS_PER_TEAM; i++) {
-      // Dark souls
-      const darkPos = this.findSpawnPosition('gray');
+      // Dark souls spawn at dark nexus
+      const darkNexus = this.nexuses.get('dark');
+      const darkPos = darkNexus.getSpawnPosition();
       const darkSoulId = `dark-soul${i + 1}`;
-      const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap);
+        const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap, false, this.movementSystem);
       this.souls.set(darkSoulId, darkSoul);
 
-      // Light souls
-      const lightPos = this.findSpawnPosition('green');
+      // Light souls spawn at light nexus
+      const lightNexus = this.nexuses.get('light');
+      const lightPos = lightNexus.getSpawnPosition();
       const lightSoulId = `light-soul${i + 1}`;
-      const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap);
+        const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap, false, this.movementSystem);
       this.souls.set(lightSoulId, lightSoul);
     }
-
   }
 
   spawnInitialOrbs() {
@@ -228,6 +242,11 @@ class GameManager {
     // Update day/night cycle FIRST (affects other systems)
     const dayNightEvents = this.dayNightSystem.update();
     this.gameEvents.push(...dayNightEvents);
+
+    // Update nexuses (health regeneration, etc.)
+    this.nexuses.forEach(nexus => {
+      nexus.update();
+    });
 
     // Update all souls
     this.souls.forEach(soul => {
@@ -387,8 +406,9 @@ class GameManager {
     // Emergency respawn if a team is extinct (no adult souls)
     if (currentDarkSouls === 0 && this.souls.size > 0) {
       const id = `dark-soul-emergency-${Date.now()}`;
-      const spawnPos = this.findSpawnPosition('gray');
-      const newSoul = new Soul(id, 'dark-soul', spawnPos.x, spawnPos.y, this.tileMap);
+      const darkNexus = this.nexuses.get('dark');
+      const spawnPos = darkNexus.getSpawnPosition();
+        const newSoul = new Soul(id, 'dark-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem);
       this.souls.set(id, newSoul);
       
       this.gameEvents.push({
@@ -405,8 +425,9 @@ class GameManager {
     
     if (currentLightSouls === 0 && this.souls.size > 0) {
       const id = `light-soul-emergency-${Date.now()}`;
-      const spawnPos = this.findSpawnPosition('green');
-      const newSoul = new Soul(id, 'light-soul', spawnPos.x, spawnPos.y, this.tileMap);
+      const lightNexus = this.nexuses.get('light');
+      const spawnPos = lightNexus.getSpawnPosition();
+        const newSoul = new Soul(id, 'light-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem);
       this.souls.set(id, newSoul);
       
       this.gameEvents.push({
@@ -468,13 +489,17 @@ class GameManager {
       }));
   }
 
+  getNexuses() {
+    return Array.from(this.nexuses.values()).map(nexus => nexus.serialize());
+  }
+
   getTileMap() {
     return this.tileMap;
   }
 
   getActiveSpells() {
     return Array.from(this.spellSystem.getActiveSpells().values()).map(spell => ({
-      id: spell.id,
+      spellId: spell.spellId,
       casterId: spell.casterId,
       casterType: spell.casterType,
       casterX: spell.casterX,
@@ -482,7 +507,7 @@ class GameManager {
       targetX: spell.targetX,
       targetY: spell.targetY,
       startTime: spell.startTime,
-      duration: GameConfig.SOUL.SPELL_CAST_TIME
+      duration: spell.completionTime - spell.startTime
     }));
   }
 

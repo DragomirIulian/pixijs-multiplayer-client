@@ -345,6 +345,11 @@ export class EffectsSystem {
     // Clear and redraw tether
     tether.clear();
     
+    // Stop rendering if animation has reached expected duration OR if force completed
+    if (progress >= 1.0 || tether.forceCompleted) {
+      return;
+    }
+    
     // Animated tether color based on caster type
     const color = spellData.casterType === 'dark-soul' ? 
       ClientConfig.COLORS.DARK_SOUL_CASTING : 
@@ -382,7 +387,8 @@ export class EffectsSystem {
     // Clear and redraw transformation effect
     effect.clear();
     
-    if (progress >= 1) return; // Effect completed
+    // Stop rendering if animation has reached expected duration OR if force completed
+    if (progress >= 1 || effect.forceCompleted) return;
     
     // Create subtle transformation effect on the tile
     const targetColor = effect.casterType === 'dark-soul' ? 

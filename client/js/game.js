@@ -8,6 +8,7 @@ import { CharacterManager } from './managers/CharacterManager.js';
 import { EnergyOrbManager } from './managers/EnergyOrbManager.js';
 import { SpellManager } from './managers/SpellManager.js';
 import { DayNightManager } from './managers/DayNightManager.js';
+import { NexusManager } from './managers/NexusManager.js';
 import { NetworkHandler } from './handlers/NetworkHandler.js';
 import StatisticsDisplay from './managers/StatisticsDisplay.js';
 
@@ -37,6 +38,7 @@ export class Game {
         this.energyOrbManager = null;
         this.spellManager = null;
         this.dayNightManager = null;
+        this.nexusManager = null;
         this.networkHandler = null;
         this.statisticsDisplay = null;
         console.log('init..');
@@ -97,6 +99,10 @@ export class Game {
         this.dayNightManager = new DayNightManager(this.app, this.gameMap);
         console.log('DayNightManager created:', this.dayNightManager);
         
+        // Initialize nexus manager
+        this.nexusManager = new NexusManager(this.app);
+        this.app.stage.addChild(this.nexusManager.container);
+        
         // Initialize statistics display
         this.statisticsDisplay = new StatisticsDisplay();
         
@@ -119,6 +125,7 @@ export class Game {
             this.gameMap,
             this.effectsSystem,
             this.dayNightManager,
+            this.nexusManager,
             this.statisticsDisplay
         );
     }
@@ -142,6 +149,7 @@ export class Game {
         this.energyOrbManager.updateOrbs(time);
         this.spellManager.updateSpells(time, this.effectsSystem);
         this.dayNightManager.update(time);
+        this.nexusManager.update(time);
         
         // Update UI components
         if (this.characterCard) {
