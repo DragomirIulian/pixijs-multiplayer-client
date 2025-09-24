@@ -18,6 +18,10 @@ class Soul {
     this.vx = (Math.random() - 0.5) * 2;
     this.vy = (Math.random() - 0.5) * 2;
     
+    // Fallback casting system for stuck souls
+    this.seekingStartTime = null;
+    this.shouldUseFallbackCasting = false;
+    
     // Energy system
     this.energy = GameConfig.SOUL.STARTING_ENERGY_MIN + 
                   Math.floor(Math.random() * (GameConfig.SOUL.STARTING_ENERGY_MAX - GameConfig.SOUL.STARTING_ENERGY_MIN));
@@ -277,6 +281,34 @@ class Soul {
     this.matingStartTime = null;
     this.isMating = false;
     this.readyToCompleteMating = false;
+  }
+
+  /**
+   * Update fallback casting system - track how long soul has been seeking
+   */
+  updateFallbackCasting() {
+    const currentState = this.getCurrentState();
+    const now = Date.now();
+    
+    if (currentState === SoulStates.SEEKING) {
+      // Start tracking seeking time
+      if (!this.seekingStartTime) {
+        this.seekingStartTime = now;
+        this.shouldUseFallbackCasting = false;
+      }
+      
+      // Enable fallback after 70% of seeking timeout
+      const seekingDuration = now - this.seekingStartTime;
+      const fallbackThreshold = GameConfig.SOUL.SEEKING_TIMEOUT * 0.5; // 70% of seeking timeout
+      if (seekingDuration > fallbackThreshold && !this.shouldUseFallbackCasting) {
+        this.shouldUseFallbackCasting = true;
+        console.log(`Soul ${this.id} stuck for ${seekingDuration}ms, enabling fallback casting`);
+      }
+    } else {
+      // Reset when not seeking
+      this.seekingStartTime = null;
+      this.shouldUseFallbackCasting = false;
+    }
   }
 
   // Serialization for client

@@ -148,15 +148,24 @@ export class GameMap {
                 // Light team scores (green)
                 const lightScore = this.borderScores.green[y][x];
                 const lightText = new Text(lightScore.toString(), lightTeamStyle);
-                lightText.x = tileData.worldX + 2;
-                lightText.y = tileData.worldY + 2;
+                
+                // Center the light score in the top half of the tile
+                const tileCenterX = tileData.worldX + (ClientConfig.MAP.TILE_DISPLAY_WIDTH / 2);
+                const lightCenterY = tileData.worldY + (ClientConfig.MAP.TILE_DISPLAY_HEIGHT / 4);
+                lightText.anchor.set(0.5, 0.5); // Center the text anchor
+                lightText.x = tileCenterX;
+                lightText.y = lightCenterY;
                 this.scoreContainer.addChild(lightText);
                 
                 // Dark team scores (gray)
                 const darkScore = this.borderScores.gray[y][x];
                 const darkText = new Text(darkScore.toString(), darkTeamStyle);
-                darkText.x = tileData.worldX + 2;
-                darkText.y = tileData.worldY + 8; // Offset below light team score
+                
+                // Center the dark score in the bottom half of the tile
+                const darkCenterY = tileData.worldY + (ClientConfig.MAP.TILE_DISPLAY_HEIGHT * 3 / 4);
+                darkText.anchor.set(0.5, 0.5); // Center the text anchor
+                darkText.x = tileCenterX;
+                darkText.y = darkCenterY;
                 this.scoreContainer.addChild(darkText);
             }
         }

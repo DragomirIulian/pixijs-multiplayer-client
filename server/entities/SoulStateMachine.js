@@ -208,7 +208,14 @@ class SoulStateMachine {
     const distanceToEnemyTile = this.findNearestEnemyTileDistance();
     const isInRange = distanceToEnemyTile <= GameConfig.SOUL.SPELL_RANGE;
     
-    // Removed debug logging to improve performance
+    // Fallback: if soul has been seeking too long, check if ANY valid targets are in range
+    if (!isInRange && this.soul.shouldUseFallbackCasting) {
+      const hasAnyTargetInRange = this.hasAnyValidTargetInRange();
+      if (hasAnyTargetInRange) {
+        this.transitionTo(SoulStates.PREPARING);
+        return;
+      }
+    }
     
     if (isInRange) {
       this.transitionTo(SoulStates.PREPARING);
@@ -545,7 +552,7 @@ class SoulStateMachine {
    */
   shouldAttackNexus(energyPercentage, allSouls) {
     // Check if there's a path to enemy nexus
-    const enemyNexusPos = this.soul.type === 'dark-soul' ? 
+    const enemyNexusPos = this.soul.type === GameConfig.SOUL_TYPES.DARK ? 
       GameConfig.NEXUS.LIGHT_NEXUS : GameConfig.NEXUS.DARK_NEXUS;
     
     const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
@@ -637,6 +644,39 @@ class SoulStateMachine {
     }
     
     return true; // Clear path through friendly territory
+  }
+
+  /**
+   * Check if there are ANY valid enemy tiles within casting range (for fallback)
+   */
+  hasAnyValidTargetInRange() {
+    if (!this.tileMap) return false;
+    
+    const soulX = this.soul.x;
+    const soulY = this.soul.y;
+    const maxDistance = GameConfig.SOUL.SPELL_RANGE;
+    const minDistance = GameConfig.SOUL.SPELL_MIN_DISTANCE;
+    const opponentType = this.soul.type === GameConfig.SOUL_TYPES.DARK ? GameConfig.TILE_TYPES.GREEN : GameConfig.TILE_TYPES.GRAY;
+    
+    // Check tiles around soul position
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        const tile = this.tileMap.tiles[y][x];
+        
+        if (tile && tile.type === opponentType) {
+          // Check distance to soul
+          const dx = (tile.worldX + this.tileMap.tileWidth / 2) - soulX;
+          const dy = (tile.worldY + this.tileMap.tileHeight / 2) - soulY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance <= maxDistance && distance >= minDistance) {
+            return true; // Found at least one valid target
+          }
+        }
+      }
+    }
+    
+    return false; // No valid targets in range
   }
 }
 

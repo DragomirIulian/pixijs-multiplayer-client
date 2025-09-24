@@ -6,20 +6,13 @@ const { SoulStates } = require('../entities/SoulStateMachine');
  * Handles spell casting, preparation, and effects
  */
 class SpellSystem {
-  constructor(tileMap, dayNightSystem = null, movementSystem = null) {
+  constructor(tileMap, dayNightSystem = null, movementSystem = null, scoringSystem = null) {
     this.tileMap = tileMap;
     this.dayNightSystem = dayNightSystem;
     this.movementSystem = movementSystem;
+    this.scoringSystem = scoringSystem;
     this.activeSpells = new Map();
     this.spellEvents = [];
-    
-    // Manhattan distance from each tile to enemy nexus
-    this.manhattanScores = {
-      green: [], // Distance from each tile to dark nexus (green team's target)
-      gray: []   // Distance from each tile to light nexus (gray team's target)
-    };
-    
-    this.calculateManhattanDistances();
   }
 
   update(allSouls) {
@@ -130,6 +123,14 @@ class SpellSystem {
   startSpellCasting(soul, targetTile, allSouls) {
     const spellId = `spell-${soul.id}-${Date.now()}`;
     
+    // DOUBLE CHECK that tile isn't already targeted (race condition protection)
+    const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
+      spell.targetTile.x === targetTile.x && spell.targetTile.y === targetTile.y
+    );
+    if (isAlreadyTargeted) {
+      return; // Abort - someone else already targeting this tile
+    }
+    
     // Get team-specific cast time multiplier
     const castTimeMultiplier = this.dayNightSystem ? 
       this.dayNightSystem.getSpellCastTimeMultiplier(soul.type) : 1.0;
@@ -220,13 +221,18 @@ class SpellSystem {
     if (!this.tileMap) return null;
 
     const teamType = soul.teamType;
-    const opponentType = soul.type === 'dark-soul' ? 'green' : 'gray';
+    const opponentType = soul.type === GameConfig.SOUL_TYPES.DARK ? GameConfig.TILE_TYPES.GREEN : GameConfig.TILE_TYPES.GRAY;
     const minDistance = GameConfig.SOUL.SPELL_MIN_DISTANCE;
     const maxDistance = GameConfig.SOUL.SPELL_RANGE;
 
-    // Find the enemy tile with LOWEST Manhattan score that can be reached by spell
+    // Use fallback casting if soul has been seeking too long
+    if (soul.shouldUseFallbackCasting) {
+      return this.findAnyValidTarget(soul, opponentType, minDistance, maxDistance);
+    }
+
+    // Find the enemy tile with HIGHEST Manhattan score that can be reached by spell
     let bestTile = null;
-    let bestManhattanScore = Infinity;
+    let bestManhattanScore = 0;
 
     // Check ALL tiles on the map
     for (let y = 0; y < this.tileMap.height; y++) {
@@ -249,10 +255,10 @@ class SpellSystem {
             if (isAlreadyTargeted) continue;
 
             // Get Manhattan score for this tile
-            const manhattanScore = this.manhattanScores[teamType][y][x];
+            const manhattanScore = this.scoringSystem.getManhattanScore(x, y, teamType);
             
-            // Pick the tile with lowest Manhattan score (closest to enemy nexus)
-            if (manhattanScore < bestManhattanScore) {
+            // Only consider tiles within the border rectangle (score > 0)
+            if (manhattanScore > 0 && manhattanScore > bestManhattanScore) {
               bestManhattanScore = manhattanScore;
               bestTile = tile;
             }
@@ -262,6 +268,47 @@ class SpellSystem {
     }
 
     return bestTile;
+  }
+
+  /**
+   * Fallback method: find ANY valid target within range (not necessarily the best scoring)
+   */
+  findAnyValidTarget(soul, opponentType, minDistance, maxDistance) {
+    const teamType = soul.teamType;
+    
+    // Check ALL tiles on the map, but return the FIRST valid one found
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        const tile = this.tileMap.tiles[y][x];
+        
+        // Only consider enemy tiles
+        if (tile && tile.type === opponentType) {
+          // Check distance to soul
+          const dx = (tile.worldX + this.tileMap.tileWidth / 2) - soul.x;
+          const dy = (tile.worldY + this.tileMap.tileHeight / 2) - soul.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          // Must be within spell range
+          if (distance <= maxDistance && distance >= minDistance) {
+            // Check if already being targeted
+            const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
+              spell.targetTile.x === tile.x && spell.targetTile.y === tile.y
+            );
+            if (isAlreadyTargeted) continue;
+
+            // Get score to ensure it's a valid target (score > 0)
+            const score = this.scoringSystem.getManhattanScore(x, y, teamType);
+            
+            // Return the FIRST valid target found (fallback doesn't care about best score)
+            if (score > 0) {
+              return tile;
+            }
+          }
+        }
+      }
+    }
+    
+    return null; // No valid targets found
   }
 
   // Handle spell interruption when soul is attacked
@@ -351,30 +398,6 @@ class SpellSystem {
     return capturedTiles;
   }
 
-  /**
-   * Calculate Manhattan distances from ALL tiles to enemy nexuses
-   */
-  calculateManhattanDistances() {
-    const width = this.tileMap.width;
-    const height = this.tileMap.height;
-    
-    // Initialize arrays
-    this.manhattanScores.green = Array(height).fill(null).map(() => Array(width).fill(0));
-    this.manhattanScores.gray = Array(height).fill(null).map(() => Array(width).fill(0));
-    
-    // Calculate Manhattan distance from every tile to enemy nexus
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        // Green team targets dark nexus
-        this.manhattanScores.green[y][x] = Math.abs(x - GameConfig.NEXUS.DARK_NEXUS.TILE_X) + 
-                                          Math.abs(y - GameConfig.NEXUS.DARK_NEXUS.TILE_Y);
-        
-        // Gray team targets light nexus  
-        this.manhattanScores.gray[y][x] = Math.abs(x - GameConfig.NEXUS.LIGHT_NEXUS.TILE_X) + 
-                                         Math.abs(y - GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y);
-      }
-    }
-  }
 
 
   /**

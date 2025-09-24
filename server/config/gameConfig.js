@@ -4,6 +4,22 @@
  */
 
 const GameConfig = {
+  // Entity types
+  SOUL_TYPES: {
+    DARK: 'dark-soul',
+    LIGHT: 'light-soul'
+  },
+  
+  TILE_TYPES: {
+    GRAY: 'gray',
+    GREEN: 'green'
+  },
+  
+  TEAM_TYPES: {
+    DARK: 'gray',  // Dark souls use gray tiles
+    LIGHT: 'green' // Light souls use green tiles
+  },
+
   // World dimensions
   WORLD: {
     WIDTH: 1500,
@@ -37,17 +53,17 @@ const GameConfig = {
     SEEKING_TRAVEL_TIME: 1500,  // Time to assume soul reached enemy tile     
     
      // Attack configuration
-     ATTACK_RANGE: 200,           // Increased from 60
+     ATTACK_RANGE: 250,           // Increased from 60
      ATTACK_COOLDOWN: 2000,      // 2 seconds
      ATTACK_DAMAGE_MIN: 15,
      ATTACK_DAMAGE_MAX: 25,
     
     // Spell configuration
     SPELL_COOLDOWN: 5000,      // 20 seconds
-    SPELL_RANGE: 100,
+    SPELL_RANGE: 150,
     SPELL_CAST_TIME: 3000,      // 5 seconds
     SPELL_PREPARATION_TIME: 1000, // 1 second
-    SPELL_MIN_DISTANCE: 50,     // Minimum distance to target tile
+    SPELL_MIN_DISTANCE: 0,     // Minimum distance to target tile
     
      // Movement and collision
      COLLISION_RADIUS: 40,

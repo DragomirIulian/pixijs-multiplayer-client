@@ -1,6 +1,7 @@
 const GameConfig = require('./config/gameConfig');
 const Soul = require('./entities/Soul');
 const Nexus = require('./entities/Nexus');
+const ScoringSystem = require('./systems/ScoringSystem');
 const MovementSystem = require('./systems/MovementSystem');
 const CombatSystem = require('./systems/CombatSystem');
 const SpellSystem = require('./systems/SpellSystem');
@@ -81,8 +82,9 @@ class GameManager {
 
   initializeSystems() {
     this.dayNightSystem = new DayNightSystem();
-    this.movementSystem = new MovementSystem(this.tileMap);
-    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem, this.movementSystem);
+    this.scoringSystem = new ScoringSystem(this.tileMap);
+    this.movementSystem = new MovementSystem(this.tileMap, this.scoringSystem);
+    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem, this.movementSystem, this.scoringSystem);
     this.combatSystem = new CombatSystem(this.spellSystem, this);
     this.matingSystem = new MatingSystem(this);
     this.statisticsManager = new StatisticsManager();
@@ -251,6 +253,7 @@ class GameManager {
     // Update all souls
     this.souls.forEach(soul => {
       soul.update(this.souls);
+      soul.updateFallbackCasting(); // Track seeking time for fallback casting
     });
 
     // Remove dead souls
@@ -498,7 +501,7 @@ class GameManager {
   }
 
   getBorderScores() {
-    return this.movementSystem ? this.movementSystem.borderScores : null;
+    return this.scoringSystem ? this.scoringSystem.getAllBorderScores() : null;
   }
 
   getActiveSpells() {

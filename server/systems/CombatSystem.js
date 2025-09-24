@@ -147,7 +147,7 @@ class CombatSystem {
     if (!this.gameManager || !this.gameManager.nexuses) return;
 
     // Get enemy nexus
-    const enemyNexusType = soul.type === 'dark-soul' ? 'light' : 'dark';
+    const enemyNexusType = soul.type === GameConfig.SOUL_TYPES.DARK ? 'light' : 'dark';
     const enemyNexus = this.gameManager.nexuses.get(enemyNexusType);
     
     if (!enemyNexus || enemyNexus.isDestroyed) return;
