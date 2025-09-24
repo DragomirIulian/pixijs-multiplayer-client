@@ -112,8 +112,8 @@ export class GameMap {
         
         // Only display scores within the border rectangle area
         // First, calculate border rectangle bounds (same logic as server)
-        const lightNexus = { TILE_X: 5, TILE_Y: 45 };  // Bottom-left nexus
-        const darkNexus = { TILE_X: 54, TILE_Y: 15 };   // Top-right nexus
+        const lightNexus = { TILE_X: 6, TILE_Y: 33 };  // Bottom-left nexus (updated for 75x45 grid)
+        const darkNexus = { TILE_X: 68, TILE_Y: 11 };   // Top-right nexus (updated for 75x45 grid)
         
         // Calculate border width based on 100 pixels divided by tile dimensions
         const borderWidthX = Math.ceil(100 / ClientConfig.MAP.TILE_DISPLAY_WIDTH);  // Horizontal border width in tiles

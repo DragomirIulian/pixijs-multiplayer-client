@@ -9,6 +9,10 @@ class MovementSystem {
   constructor(tileMap, scoringSystem) {
     this.tileMap = tileMap;
     this.scoringSystem = scoringSystem;
+    // Track soul positions for stuck detection
+    this.soulPositionHistory = new Map();
+    this.stuckThreshold = 3; // How many updates to track for stuck detection
+    this.stuckDistance = 20; // Distance threshold to consider soul stuck
   }
 
   updateSoul(soul, allSouls, energyOrbs, movementMultiplier = 1.0) {
@@ -248,7 +252,7 @@ class MovementSystem {
           bestScore = score;
           bestTile = {
             tileX: x,
-            tileY: y,
+            tileY: teamType === GameConfig.TEAM_TYPES.LIGHT ? GameConfig.NEXUS.DARK_NEXUS.TILE_Y : GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y,
             worldX: x * this.tileMap.tileWidth + this.tileMap.tileWidth / 2,
             worldY: y * this.tileMap.tileHeight + this.tileMap.tileHeight / 2,
             score: score
@@ -269,8 +273,12 @@ class MovementSystem {
     const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
     const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
     
+    if(soul.teamType === 'green') {
+      console.log('soulTileX', soulTileX, 'soulTileY', soulTileY, 'targetTile', targetTile);
+    }
     // Step 1: Check if soul is on their assigned border
     if (!this.isOnAssignedBorderPath(soulTileX, soulTileY, teamType)) {
+      console.log('not on border - move to closest border entry');
       // Not on border - move to closest border entry
       return this.findClosestBorderEntry(soul);
     }
@@ -350,12 +358,12 @@ class MovementSystem {
     
     // Check if on team's assigned border sides
     if (teamType === 'green') {
-      const isOnTopBorder = (y <= borderRect.top + borderDims.widthY);
+      const isOnTopBorder = (y == GameConfig.NEXUS.DARK_NEXUS.TILE_Y);
       const isOnLeftBorder = (x <= borderRect.left + borderDims.widthX);
       return isOnTopBorder || isOnLeftBorder;
     } else {
       const isOnRightBorder = (x >= borderRect.right - borderDims.widthX);
-      const isOnBottomBorder = (y >= borderRect.bottom - borderDims.widthY);
+      const isOnBottomBorder = (y == GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y);
       return isOnRightBorder || isOnBottomBorder;
     }
   }
@@ -384,6 +392,7 @@ class MovementSystem {
       return this.findClosestBorderEntry(soul); // Fallback
     }
     
+    bestTileY = teamType === GameConfig.TEAM_TYPES.LIGHT ? GameConfig.NEXUS.DARK_NEXUS.TILE_Y : GameConfig.NEXUS.LIGHT_NEXUS.TILE_Y; 
     // Move along border toward the highest scoring area
     const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
     const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
@@ -441,7 +450,7 @@ class MovementSystem {
       if (distToTop < distToLeft) {
         // Move to top border
         targetX = soulTileX;
-        targetY = borderRect.top;
+        targetY = GameConfig.NEXUS.DARK_NEXUS.TILE_Y;
       } else {
         // Move to left border
         targetX = borderRect.left;
@@ -535,19 +544,36 @@ class MovementSystem {
   }
 
   moveTowardsTarget(soul, target, speed) {
+    // Check if soul is stuck and use corner avoidance if needed
+    if (this.isSoulStuck(soul)) {
+      this.moveAroundCorner(soul, target, speed);
+      return;
+    }
+
     const dx = target.x - soul.x;
     const dy = target.y - soul.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance > 0) {
-      soul.setVelocity(
-        (dx / distance) * speed,
-        (dy / distance) * speed
-      );
+      // Check if direct path is blocked
+      if (this.isDirectPathBlocked(soul, target)) {
+        this.moveAroundCorner(soul, target, speed);
+      } else {
+        soul.setVelocity(
+          (dx / distance) * speed,
+          (dy / distance) * speed
+        );
+      }
     }
   }
 
   moveTowardsTargetSmart(soul, target, speed) {
+    // Check if soul is stuck and use corner avoidance if needed
+    if (this.isSoulStuck(soul)) {
+      this.moveAroundCorner(soul, target, speed);
+      return;
+    }
+
     const dx = target.x - soul.x;
     const dy = target.y - soul.y;
     const absDx = Math.abs(dx);
@@ -580,11 +606,16 @@ class MovementSystem {
     const finalDistance = Math.sqrt(finalDx * finalDx + finalDy * finalDy);
     
     if (finalDistance > 10) {
-      // Move directly towards target, normalized
-      soul.setVelocity(
-        (finalDx / finalDistance) * speed,
-        (finalDy / finalDistance) * speed
-      );
+      // Check if direct path is blocked and use corner avoidance
+      if (this.isDirectPathBlocked(soul, {x: targetX, y: targetY})) {
+        this.moveAroundCorner(soul, {x: targetX, y: targetY}, speed);
+      } else {
+        // Move directly towards target, normalized
+        soul.setVelocity(
+          (finalDx / finalDistance) * speed,
+          (finalDy / finalDistance) * speed
+        );
+      }
     } else {
       // Close enough - stop
       soul.setVelocity(0, 0);
@@ -790,6 +821,267 @@ class MovementSystem {
       soul.vy *= -1;
       soul.y = Math.max(GameConfig.WORLD.BOUNDARY_BUFFER, 
                        Math.min(GameConfig.WORLD.HEIGHT - GameConfig.WORLD.BOUNDARY_BUFFER, soul.y));
+    }
+  }
+
+  /**
+   * Corner Avoidance and Stuck Detection Methods
+   */
+
+  /**
+   * Check if a soul is stuck by tracking its movement history
+   */
+  isSoulStuck(soul) {
+    const soulId = soul.id;
+    const currentTime = Date.now();
+    const currentPos = { x: soul.x, y: soul.y, time: currentTime };
+
+    // Initialize position history for this soul
+    if (!this.soulPositionHistory.has(soulId)) {
+      this.soulPositionHistory.set(soulId, []);
+    }
+
+    const history = this.soulPositionHistory.get(soulId);
+    history.push(currentPos);
+
+    // Keep only recent history
+    const maxAge = 2000; // 2 seconds
+    while (history.length > 0 && currentTime - history[0].time > maxAge) {
+      history.shift();
+    }
+
+    // Need at least a few position samples to determine if stuck
+    if (history.length < this.stuckThreshold) {
+      return false;
+    }
+
+    // Check if soul has moved very little over the tracking period
+    const oldestPos = history[0];
+    const distance = Math.sqrt(
+      Math.pow(currentPos.x - oldestPos.x, 2) + 
+      Math.pow(currentPos.y - oldestPos.y, 2)
+    );
+
+    return distance < this.stuckDistance;
+  }
+
+  /**
+   * Check if the direct path to target is blocked by invalid positions
+   */
+  isDirectPathBlocked(soul, target) {
+    const steps = 5; // Number of points to check along the path
+    const dx = target.x - soul.x;
+    const dy = target.y - soul.y;
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const checkX = soul.x + dx * t;
+      const checkY = soul.y + dy * t;
+
+      if (!this.isValidPosition(checkX, checkY, soul.getTeamType())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Navigate around corners using a wall-following algorithm
+   */
+  moveAroundCorner(soul, target, speed) {
+    // First try tunnel-specific navigation if we're in a tunnel
+    if (this.isSoulInTunnel(soul)) {
+      if (this.navigateTunnel(soul, target, speed)) {
+        return; // Successfully navigating tunnel
+      }
+    }
+
+    // Try to find a valid direction that gets closer to target
+    const directions = [
+      { x: 1, y: 0, name: 'right' },   // East
+      { x: 0, y: 1, name: 'down' },    // South  
+      { x: -1, y: 0, name: 'left' },   // West
+      { x: 0, y: -1, name: 'up' },     // North
+      { x: 1, y: 1, name: 'southeast' },    // Southeast
+      { x: -1, y: 1, name: 'southwest' },   // Southwest
+      { x: 1, y: -1, name: 'northeast' },   // Northeast
+      { x: -1, y: -1, name: 'northwest' }   // Northwest
+    ];
+
+    let bestDirection = null;
+    let bestScore = -Infinity;
+
+    const stepSize = 30; // How far to check in each direction
+
+    for (const dir of directions) {
+      const testX = soul.x + dir.x * stepSize;
+      const testY = soul.y + dir.y * stepSize;
+
+      // Check if this direction is valid
+      if (this.isValidPosition(testX, testY, soul.getTeamType())) {
+        // Calculate how much closer this gets us to target
+        const currentDist = Math.sqrt(
+          Math.pow(target.x - soul.x, 2) + 
+          Math.pow(target.y - soul.y, 2)
+        );
+        const newDist = Math.sqrt(
+          Math.pow(target.x - testX, 2) + 
+          Math.pow(target.y - testY, 2)
+        );
+        
+        // Score based on progress toward target
+        const progress = currentDist - newDist;
+        
+        // Bonus for cardinal directions in tunnels (they're usually more effective)
+        const cardinalBonus = (Math.abs(dir.x) + Math.abs(dir.y) === 1) ? 5 : 0;
+        
+        // Add some randomness to prevent infinite loops
+        const randomBonus = (Math.random() - 0.5) * 5;
+        const score = progress + cardinalBonus + randomBonus;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestDirection = dir;
+        }
+      }
+    }
+
+    if (bestDirection) {
+      // Move in the best direction found
+      soul.setVelocity(
+        bestDirection.x * speed,
+        bestDirection.y * speed
+      );
+    } else {
+      // All directions blocked - try random movement to escape
+      this.escapeStuckPosition(soul, speed);
+    }
+  }
+
+  /**
+   * Check if soul is currently in a tunnel
+   */
+  isSoulInTunnel(soul) {
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    
+    // Check if we're in a narrow corridor (tunnel-like area)
+    let openDirections = 0;
+    const directions = [
+      { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+    ];
+    
+    for (const dir of directions) {
+      const checkX = soulTileX + dir.x;
+      const checkY = soulTileY + dir.y;
+      
+      if (checkX >= 0 && checkX < this.tileMap.width && 
+          checkY >= 0 && checkY < this.tileMap.height) {
+        const tile = this.tileMap.tiles[checkY][checkX];
+        if (tile && tile.type === soul.getTeamType()) {
+          openDirections++;
+        }
+      }
+    }
+    
+    // If only 2 or fewer directions are open, we're likely in a tunnel
+    return openDirections <= 2;
+  }
+
+  /**
+   * Special navigation logic for tunnel systems
+   */
+  navigateTunnel(soul, target, speed) {
+    const soulTileX = Math.floor(soul.x / this.tileMap.tileWidth);
+    const soulTileY = Math.floor(soul.y / this.tileMap.tileHeight);
+    const targetTileX = Math.floor(target.x / this.tileMap.tileWidth);
+    const targetTileY = Math.floor(target.y / this.tileMap.tileHeight);
+    
+    // In tunnels, prioritize movement along the main axis toward target
+    const dx = targetTileX - soulTileX;
+    const dy = targetTileY - soulTileY;
+    
+    let preferredDirection = null;
+    
+    // Choose primary direction based on which has larger distance
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Move horizontally first
+      preferredDirection = dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+    } else {
+      // Move vertically first  
+      preferredDirection = dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+    }
+    
+    // Test if preferred direction is valid
+    const testX = soul.x + preferredDirection.x * 30;
+    const testY = soul.y + preferredDirection.y * 30;
+    
+    if (this.isValidPosition(testX, testY, soul.getTeamType())) {
+      soul.setVelocity(
+        preferredDirection.x * speed,
+        preferredDirection.y * speed
+      );
+      return true;
+    }
+    
+    // If preferred direction blocked, try the perpendicular direction
+    const altDirection = Math.abs(dx) > Math.abs(dy) ? 
+      (dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 }) :
+      (dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+    
+    const altTestX = soul.x + altDirection.x * 30;
+    const altTestY = soul.y + altDirection.y * 30;
+    
+    if (this.isValidPosition(altTestX, altTestY, soul.getTeamType())) {
+      soul.setVelocity(
+        altDirection.x * speed,
+        altDirection.y * speed
+      );
+      return true;
+    }
+    
+    return false; // Let general corner navigation handle it
+  }
+
+  /**
+   * Emergency escape when completely stuck
+   */
+  escapeStuckPosition(soul, speed) {
+    // Try random directions with increasing step sizes
+    for (let stepSize = 20; stepSize <= 60; stepSize += 20) {
+      for (let attempts = 0; attempts < 8; attempts++) {
+        const angle = (Math.PI * 2 * attempts) / 8;
+        const testX = soul.x + Math.cos(angle) * stepSize;
+        const testY = soul.y + Math.sin(angle) * stepSize;
+
+        if (this.isValidPosition(testX, testY, soul.getTeamType())) {
+          soul.setVelocity(
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed
+          );
+          return;
+        }
+      }
+    }
+
+    // Last resort - small random movement
+    soul.setVelocity(
+      (Math.random() - 0.5) * speed * 0.5,
+      (Math.random() - 0.5) * speed * 0.5
+    );
+  }
+
+  /**
+   * Clean up position history for dead or removed souls to prevent memory leaks
+   */
+  cleanupPositionHistory(aliveSoulIds) {
+    const currentSoulIds = new Set(aliveSoulIds);
+    
+    for (const [soulId] of this.soulPositionHistory) {
+      if (!currentSoulIds.has(soulId)) {
+        this.soulPositionHistory.delete(soulId);
+      }
     }
   }
 

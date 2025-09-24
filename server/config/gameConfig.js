@@ -24,15 +24,15 @@ const GameConfig = {
   WORLD: {
     WIDTH: 1500,
     HEIGHT: 900,
-    BOUNDARY_BUFFER: 50
+    BOUNDARY_BUFFER: 10
   },
 
   // Tile map configuration
   TILEMAP: {
-    WIDTH: 60,
-    HEIGHT: 60,
-    TILE_WIDTH: 25,
-    TILE_HEIGHT: 15
+    WIDTH: 75,      // Updated to match 1500px / 20px = 75 tiles
+    HEIGHT: 45,     // Updated to match 900px / 20px = 45 tiles
+    TILE_WIDTH: 20, // Square tiles: 20x20 pixels
+    TILE_HEIGHT: 20 // Square tiles: 20x20 pixels
   },
 
   // Soul configuration
@@ -77,7 +77,7 @@ const GameConfig = {
      RETREAT_FORCE_DISTANCE: 100, // Distance to move when retreating
     
     // Retreat behavior
-    RETREAT_DURATION: 5000,     // 5 seconds
+    RETREAT_DURATION: 1000,     // 5 seconds
     
     // Energy drain
     ENERGY_DRAIN_CHANCE: 0.05,  
@@ -97,7 +97,7 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 7,
+    SOULS_PER_TEAM: 10,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
@@ -117,7 +117,7 @@ const GameConfig = {
 
   // Mating and reproduction configuration
   MATING: {
-    MIN_RESTING_SOULS: 3,       // Minimum souls per team to avoid extinction
+    MIN_RESTING_SOULS: 0,       // Minimum souls per team to avoid extinction
     MAX_SOULS_PER_TEAM: 10,      // Maximum souls per team
     MIN_ENERGY_FOR_MATING: 0.5, // 30% energy required to mate (reduced for testing)
     MATING_RANGE: 120,          // Distance souls need to be for mating (increased)
@@ -157,14 +157,14 @@ const GameConfig = {
     DESTRUCTION_DAMAGE: 100,     // Damage dealt when nexus is destroyed
     SPAWN_OFFSET_RANGE: 25,     // Random offset range for spawning around nexus
     
-    // Positions (in tile coordinates)
+    // Positions (in tile coordinates) - Updated for 75x45 grid
     LIGHT_NEXUS: {
-      TILE_X: 5,                // Left bottom corner
-      TILE_Y: 45
+      TILE_X: 6,                // Left bottom corner (proportionally adjusted)
+      TILE_Y: 33                // Bottom area (proportionally adjusted: 45*0.75 ≈ 33)
     },
     DARK_NEXUS: {
-      TILE_X: 54,               // Right top corner  
-      TILE_Y: 15                // Lowered by ~100 pixels (about 6-7 tiles)
+      TILE_X: 68,               // Right top corner (proportionally adjusted: 75*0.9 ≈ 68)
+      TILE_Y: 11                // Top area (proportionally adjusted: 45*0.25 ≈ 11)
     },
 
     // Combat and pathfinding

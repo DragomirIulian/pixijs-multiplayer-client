@@ -259,6 +259,10 @@ class GameManager {
     // Remove dead souls
     this.handleSoulDeaths();
 
+    // Clean up movement system position history for removed souls
+    const aliveSoulIds = Array.from(this.souls.keys());
+    this.movementSystem.cleanupPositionHistory(aliveSoulIds);
+
     // Update movement system (with team-specific day/night speed modifier)
     this.souls.forEach(soul => {
       const movementMultiplier = this.dayNightSystem.getMovementMultiplier(soul.type);
@@ -407,7 +411,7 @@ class GameManager {
     const currentLightSouls = Array.from(this.souls.values()).filter(s => s.type === 'light-soul' && s.isAdult()).length;
     
     // Emergency respawn if a team is extinct (no adult souls)
-    if (currentDarkSouls === 0 && this.souls.size > 0) {
+    if (currentDarkSouls < 10 && this.souls.size > 0) {
       const id = `dark-soul-emergency-${Date.now()}`;
       const darkNexus = this.nexuses.get('dark');
       const spawnPos = darkNexus.getSpawnPosition();
@@ -426,7 +430,7 @@ class GameManager {
       });
     }
     
-    if (currentLightSouls === 0 && this.souls.size > 0) {
+    if (currentLightSouls < 10 && this.souls.size > 0) {
       const id = `light-soul-emergency-${Date.now()}`;
       const lightNexus = this.nexuses.get('light');
       const spawnPos = lightNexus.getSpawnPosition();

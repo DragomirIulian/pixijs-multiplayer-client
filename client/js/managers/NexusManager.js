@@ -58,9 +58,9 @@ export class NexusManager {
         nexusSprite.anchor.set(0.5);
         nexusSprite.x = 0;
         nexusSprite.y = 0;
-        // Scale to 8x8 tiles (8 * tileWidth = 8 * 25 = 200 pixels)
+        // Scale to 8x8 tiles (8 * tileWidth = 8 * 20 = 160 pixels)
         const NEXUS_SIZE_TILES = 8;
-        const TILE_WIDTH = 25; // From server config
+        const TILE_WIDTH = ClientConfig.MAP.TILE_DISPLAY_WIDTH; // Use config instead of hardcoded value
         nexusSprite.width = NEXUS_SIZE_TILES * TILE_WIDTH;
         nexusSprite.height = NEXUS_SIZE_TILES * TILE_WIDTH;
         
