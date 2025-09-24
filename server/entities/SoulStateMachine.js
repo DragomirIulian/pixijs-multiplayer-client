@@ -132,12 +132,13 @@ class SoulStateMachine {
       // The MatingSystem will coordinate and start mating for compatible pairs
     }
 
-    // Check if should defend (highest priority - overrides all except mating/resting)
+    // TEMPORARILY REDUCED: Check if should defend (highest priority - overrides all except mating/resting)
     // Only one soul should defend per casting enemy
-    if (this.shouldBeDefender(allSouls)) {
-      this.transitionTo(SoulStates.DEFENDING);
-      return;
-    }
+    // Reducing defense priority to allow more souls to attack nexus
+    // if (this.shouldBeDefender(allSouls)) {
+    //   this.transitionTo(SoulStates.DEFENDING);
+    //   return;
+    // }
 
     // Check if should attack enemy nexus (high priority - when close and healthy)
     if (this.shouldAttackNexus(energyPercentage, allSouls)) {
@@ -169,11 +170,12 @@ class SoulStateMachine {
   handleHungryState(energyPercentage, allSouls) {
     // Children cannot defend - only eat and roam
     if (!this.soul.isChild) {
-      // Check if should defend (overrides all) - only for adults
-      if (this.shouldBeDefender(allSouls)) {
-        this.transitionTo(SoulStates.DEFENDING);
-        return;
-      }
+      // TEMPORARILY REDUCED: Check if should defend (overrides all) - only for adults
+      // Allowing more souls to focus on nexus attack instead of constant defense
+      // if (this.shouldBeDefender(allSouls)) {
+      //   this.transitionTo(SoulStates.DEFENDING);
+      //   return;
+      // }
     }
 
     // Return to roaming when energy is above 50%
@@ -192,11 +194,12 @@ class SoulStateMachine {
       return;
     }
 
-    // Check if should defend (overrides all)
-    if (this.shouldBeDefender(allSouls)) {
-      this.transitionTo(SoulStates.DEFENDING);
-      return;
-    }
+    // TEMPORARILY DISABLED: Check if should defend (overrides all)
+    // Allowing souls to focus more on reaching nexus
+    // if (this.shouldBeDefender(allSouls)) {
+    //   this.transitionTo(SoulStates.DEFENDING);
+    //   return;
+    // }
 
     // Check if should become hungry
     if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
@@ -549,6 +552,7 @@ class SoulStateMachine {
 
   /**
    * Check if soul should attack enemy nexus
+   * Triggers when: 1) No valid tiles available (score > 0), OR 2) Close to nexus with clear path
    */
   shouldAttackNexus(energyPercentage, allSouls) {
     // Check if there's a path to enemy nexus
@@ -558,7 +562,14 @@ class SoulStateMachine {
     const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
     const nexusWorldY = enemyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
     
-    // Only attack if there's a clear path to nexus (can reach within soul height limit)
+    // NEW CONDITION: Check if there are NO valid tiles available for casting
+    const hasValidTilesAvailable = this.hasValidCastingTargets();
+    if (!hasValidTilesAvailable) {
+      // No tiles to cast on - attack nexus as fallback
+      return this.hasPathToNexus(nexusWorldX, nexusWorldY);
+    }
+    
+    // ORIGINAL CONDITION: Attack if close to nexus with clear path
     return this.hasPathToNexus(nexusWorldX, nexusWorldY);
   }
 
@@ -572,11 +583,12 @@ class SoulStateMachine {
       return;
     }
 
-    // Check if should defend (overrides nexus attacking)
-    if (this.shouldBeDefender(allSouls)) {
-      this.transitionTo(SoulStates.DEFENDING);
-      return;
-    }
+    // TEMPORARILY DISABLED: Check if should defend (overrides nexus attacking)
+    // Souls attacking nexus should stay focused on nexus, not get distracted by defense
+    // if (this.shouldBeDefender(allSouls)) {
+    //   this.transitionTo(SoulStates.DEFENDING);
+    //   return;
+    // }
 
     // Souls engage in attacking until they die - no retreat once attacking nexus
     // They will continue attacking or move towards nexus until eliminated
@@ -584,6 +596,7 @@ class SoulStateMachine {
 
   /**
    * Check if there's a path to enemy nexus within soul height limit (10 tiles)
+   * TEMPORARILY RELAXED: Simplified path checking to allow easier nexus access
    */
   hasPathToNexus(nexusWorldX, nexusWorldY) {
     if (!this.tileMap) return false;
@@ -596,21 +609,24 @@ class SoulStateMachine {
     const nexusTileX = Math.floor(nexusWorldX / this.tileMap.tileWidth);
     const nexusTileY = Math.floor(nexusWorldY / this.tileMap.tileHeight);
     
-    // Simple path check: see if we can reach nexus through friendly territory
-    // within the height limit (souls are 5 tiles height, path should be 10 tiles)
-    const maxDistance = GameConfig.NEXUS.MAX_ATTACK_DISTANCE;
+    // TEMPORARILY RELAXED: Just check distance, ignore path requirements
+    // This allows souls to attack nexus more easily for testing
+    const maxDistance = GameConfig.NEXUS.MAX_ATTACK_DISTANCE * 2; // Double the range
     
     // Calculate straight-line distance
     const dx = Math.abs(nexusTileX - soulTileX);
     const dy = Math.abs(nexusTileY - soulTileY);
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // If nexus is within reachable distance and we have a clear path through friendly tiles
-    if (distance <= maxDistance) {
-      return this.hasLinearPathThroughFriendlyTerritory(soulTileX, soulTileY, nexusTileX, nexusTileY);
-    }
+    // SIMPLIFIED: Just check if nexus is within extended range
+    return distance <= maxDistance;
     
-    return false;
+    // ORIGINAL CODE (temporarily disabled):
+    // If nexus is within reachable distance and we have a clear path through friendly tiles
+    // if (distance <= maxDistance) {
+    //   return this.hasLinearPathThroughFriendlyTerritory(soulTileX, soulTileY, nexusTileX, nexusTileY);
+    // }
+    // return false;
   }
 
   /**
@@ -677,6 +693,37 @@ class SoulStateMachine {
     }
     
     return false; // No valid targets in range
+  }
+
+  /**
+   * Check if there are ANY valid casting targets with score > 0 anywhere on the map
+   * Used to determine if soul should fall back to nexus attack
+   */
+  hasValidCastingTargets() {
+    if (!this.tileMap || !this.movementSystem || !this.movementSystem.scoringSystem) return false;
+    
+    const teamType = this.soul.teamType;
+    const opponentType = this.soul.type === GameConfig.SOUL_TYPES.DARK ? GameConfig.TILE_TYPES.GREEN : GameConfig.TILE_TYPES.GRAY;
+    
+    // Check ALL tiles on the map for any with score > 0
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        const tile = this.tileMap.tiles[y][x];
+        
+        // Only consider enemy tiles
+        if (tile && tile.type === opponentType) {
+          // Get score for this tile
+          const score = this.movementSystem.scoringSystem.getBorderScore(x, y, teamType);
+          
+          // If any tile has score > 0, there are valid targets
+          if (score > 0) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false; // No valid casting targets found
   }
 }
 

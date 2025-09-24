@@ -230,9 +230,10 @@ class SpellSystem {
       return this.findAnyValidTarget(soul, opponentType, minDistance, maxDistance);
     }
 
-    // Find the enemy tile with HIGHEST Manhattan score that can be reached by spell
-    let bestTile = null;
-    let bestManhattanScore = 0;
+    // First pass: Find available tiles (not already targeted) and prioritize them
+    let availableTiles = [];
+    let bestUnavailableTile = null;
+    let bestUnavailableScore = 0;
 
     // Check ALL tiles on the map
     for (let y = 0; y < this.tileMap.height; y++) {
@@ -248,35 +249,64 @@ class SpellSystem {
 
           // Must be within spell range
           if (distance <= maxDistance && distance >= minDistance) {
-            // Check if already being targeted
-            const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
-              spell.targetTile.x === tile.x && spell.targetTile.y === tile.y
-            );
-            if (isAlreadyTargeted) continue;
-
             // Get Manhattan score for this tile
             const manhattanScore = this.scoringSystem.getManhattanScore(x, y, teamType);
             
             // Only consider tiles within the border rectangle (score > 0)
-            if (manhattanScore > 0 && manhattanScore > bestManhattanScore) {
-              bestManhattanScore = manhattanScore;
-              bestTile = tile;
+            if (manhattanScore > 0) {
+              // Check if already being targeted
+              const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
+                spell.targetTile.x === tile.x && spell.targetTile.y === tile.y
+              );
+              
+              if (!isAlreadyTargeted) {
+                // This tile is available - add to available tiles list
+                availableTiles.push({
+                  tile: tile,
+                  score: manhattanScore,
+                  distance: distance
+                });
+              } else {
+                // Track best unavailable tile as fallback
+                if (manhattanScore > bestUnavailableScore) {
+                  bestUnavailableScore = manhattanScore;
+                  bestUnavailableTile = tile;
+                }
+              }
             }
           }
         }
       }
     }
 
-    return bestTile;
+    // If we have available tiles, select the best one
+    if (availableTiles.length > 0) {
+      // Sort by score (descending), then by distance (ascending) as tiebreaker
+      availableTiles.sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score; // Higher score wins
+        }
+        return a.distance - b.distance; // Closer distance wins for same score
+      });
+      
+      return availableTiles[0].tile;
+    }
+
+    // No available tiles found - return the best unavailable tile (original behavior)
+    // This allows souls to wait for high-value targets when all tiles are contested
+    return bestUnavailableTile;
   }
 
   /**
    * Fallback method: find ANY valid target within range (not necessarily the best scoring)
+   * Prioritizes available tiles over occupied ones, but is less picky about scores
    */
   findAnyValidTarget(soul, opponentType, minDistance, maxDistance) {
     const teamType = soul.teamType;
+    let firstAvailableTile = null;
+    let firstOccupiedTile = null;
     
-    // Check ALL tiles on the map, but return the FIRST valid one found
+    // Check ALL tiles on the map, but prioritize available tiles
     for (let y = 0; y < this.tileMap.height; y++) {
       for (let x = 0; x < this.tileMap.width; x++) {
         const tile = this.tileMap.tiles[y][x];
@@ -290,25 +320,30 @@ class SpellSystem {
 
           // Must be within spell range
           if (distance <= maxDistance && distance >= minDistance) {
-            // Check if already being targeted
-            const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
-              spell.targetTile.x === tile.x && spell.targetTile.y === tile.y
-            );
-            if (isAlreadyTargeted) continue;
-
             // Get score to ensure it's a valid target (score > 0)
             const score = this.scoringSystem.getManhattanScore(x, y, teamType);
             
-            // Return the FIRST valid target found (fallback doesn't care about best score)
             if (score > 0) {
-              return tile;
+              // Check if already being targeted
+              const isAlreadyTargeted = Array.from(this.activeSpells.values()).some(spell => 
+                spell.targetTile.x === tile.x && spell.targetTile.y === tile.y
+              );
+              
+              if (!isAlreadyTargeted) {
+                // Found an available tile - return immediately
+                return tile;
+              } else if (!firstOccupiedTile) {
+                // Track first occupied tile as fallback
+                firstOccupiedTile = tile;
+              }
             }
           }
         }
       }
     }
     
-    return null; // No valid targets found
+    // Return occupied tile as last resort if no available tiles found
+    return firstOccupiedTile;
   }
 
   // Handle spell interruption when soul is attacked
@@ -357,7 +392,7 @@ class SpellSystem {
   }
 
   /**
-   * Capture tiles in a cross shape (5 tiles total)
+   * Capture tiles in a 3x3 square (9 tiles total)
    * @param {Object} centerTile - The target tile of the spell
    * @param {string} newTileType - The team type to convert tiles to
    * @returns {Array} Array of captured tiles
@@ -365,16 +400,20 @@ class SpellSystem {
   captureTunnel(centerTile, newTileType) {
     const capturedTiles = [];
     
-    // Cross pattern: center + 4 adjacent tiles (up, down, left, right)
-    const crossPattern = [
+    // 3x3 square pattern: center + all 8 surrounding tiles
+    const squarePattern = [
+      { x: -1, y: -1 }, // Top-left
+      { x: 0, y: -1 },  // Top-center
+      { x: 1, y: -1 },  // Top-right
+      { x: -1, y: 0 },  // Middle-left
       { x: 0, y: 0 },   // Center
-      { x: -1, y: 0 },  // Left
-      { x: 1, y: 0 },   // Right
-      { x: 0, y: -1 },  // Up
-      { x: 0, y: 1 }    // Down
+      { x: 1, y: 0 },   // Middle-right
+      { x: -1, y: 1 },  // Bottom-left
+      { x: 0, y: 1 },   // Bottom-center
+      { x: 1, y: 1 }    // Bottom-right
     ];
     
-    crossPattern.forEach(offset => {
+    squarePattern.forEach(offset => {
       const tileX = centerTile.x + offset.x;
       const tileY = centerTile.y + offset.y;
       
