@@ -45,6 +45,9 @@ export class NetworkHandler {
             case 'orb_collected':
                 this.energyOrbManager.handleOrbCollection(data.orbId, data.collectorId, this.characterManager, this.effectsSystem);
                 break;
+            case 'orb_removed':
+                this.energyOrbManager.removeEnergyOrb(data.orbId);
+                break;
             case 'attack':
                 this.characterManager.handleAttack(data.attackerId, data.targetId, data.attackerPos, data.targetPos, this.effectsSystem);
                 break;
@@ -98,6 +101,10 @@ export class NetworkHandler {
                 // Handle nexus destruction
                 console.log(`[NetworkHandler] Nexus destroyed! ${data.nexusType} nexus destroyed by ${data.destroyedByTeam} team`);
                 // Could add special effects or UI notifications here
+                break;
+            case 'nexus_update':
+                // Real-time nexus health updates during attacks
+                this.nexusManager.updateNexus(data.nexus);
                 break;
         }
     }

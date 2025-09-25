@@ -102,6 +102,12 @@ class ScoringSystem {
       return 0;
     }
     
+    // Check if tile is occupied by friendly nexus (0 score - can't attack own nexus tiles)
+    const friendlyNexus = teamType === 'green' ? GameConfig.NEXUS.LIGHT_NEXUS : GameConfig.NEXUS.DARK_NEXUS;
+    if (this.isTileOccupiedByNexus(x, y, friendlyNexus)) {
+      return 0;
+    }
+    
     // Team-specific border restrictions
     if (teamType === 'green') {
       // Light team: ONLY top and left sides of rectangle

@@ -33,6 +33,7 @@ class MovementSystem {
       SoulStates.ROAMING,
       SoulStates.HUNGRY, 
       SoulStates.SEEKING,
+      SoulStates.SEEKING_NEXUS,
       SoulStates.DEFENDING  // Moving toward enemy to attack
       // ATTACKING state not included - souls should stop moving when attacking
     ];
@@ -77,6 +78,11 @@ class MovementSystem {
           moveTarget = this.getNexusTarget(soul);
         }
         movementType = 'seek';
+        break;
+
+      case SoulStates.SEEKING_NEXUS:
+        moveTarget = this.getNexusTarget(soul);
+        movementType = 'seek_nexus';
         break;
 
       case SoulStates.ATTACKING_NEXUS:
@@ -838,7 +844,7 @@ class MovementSystem {
    */
   escapeStuckPosition(soul, speed) {
     // Try random directions with increasing step sizes
-    for (let stepSize = 20; stepSize <= 60; stepSize += 20) {
+    for (let stepSize = 20; stepSize <= 800; stepSize += 50) {
       for (let attempts = 0; attempts < 8; attempts++) {
         const angle = (Math.PI * 2 * attempts) / 8;
         const testX = soul.x + Math.cos(angle) * stepSize;
@@ -924,7 +930,7 @@ class MovementSystem {
   }
 
   /**
-   * Get enemy nexus position as movement target
+   * Get enemy nexus position as movement target - find closest valid position to nexus
    */
   getNexusTarget(soul) {
     if (!this.tileMap) return null;
@@ -935,7 +941,101 @@ class MovementSystem {
     const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
     const nexusWorldY = enemyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
     
-    return { x: nexusWorldX, y: nexusWorldY };
+    // Find the closest valid position to the nexus that soul can actually reach
+    const targetPosition = this.findClosestValidPositionToTarget(soul, nexusWorldX, nexusWorldY);
+    
+    if (targetPosition) {
+
+      return targetPosition;
+    } 
+    
+  }
+
+  /**
+   * Find a position on the border of friendly territory that's closest to the target
+   */
+  findBorderPositionTowardsTarget(soul, targetX, targetY) {
+    const teamType = soul.getTeamType();
+    const enemyTeamType = teamType === 'green' ? 'gray' : 'green';
+    let bestPosition = null;
+    let closestDistance = Infinity;
+    
+    // Check tiles that are on the border (friendly tile next to enemy tile)
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        const tile = this.tileMap.tiles[y][x];
+        
+        // Only consider friendly tiles
+        if (tile.type === teamType) {
+          // Check if this tile is adjacent to enemy territory
+          let isOnBorder = false;
+          const adjacentOffsets = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          
+          for (const [dx, dy] of adjacentOffsets) {
+            const checkX = x + dx;
+            const checkY = y + dy;
+            
+            if (checkX >= 0 && checkX < this.tileMap.width && 
+                checkY >= 0 && checkY < this.tileMap.height) {
+              const adjacentTile = this.tileMap.tiles[checkY][checkX];
+              if (adjacentTile.type === enemyTeamType) {
+                isOnBorder = true;
+                break;
+              }
+            }
+          }
+          
+          if (isOnBorder) {
+            const worldX = x * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
+            const worldY = y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
+            
+            // Check if this position is actually valid (passes all movement restrictions)
+            if (this.isValidPosition(worldX, worldY, teamType)) {
+              const distance = Math.sqrt((worldX - targetX) ** 2 + (worldY - targetY) ** 2);
+              if (distance < closestDistance) {
+                closestDistance = distance;
+                bestPosition = { x: worldX, y: worldY };
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return bestPosition;
+  }
+
+  /**
+   * Find the closest valid position (in friendly territory) to a target position
+   */
+  findClosestValidPositionToTarget(soul, targetX, targetY) {
+    const teamType = soul.getTeamType();
+    let bestPosition = null;
+    let closestDistance = Infinity;
+    
+    // Convert target to tile coordinates
+    const targetTileX = Math.floor(targetX / this.tileMap.tileWidth);
+    const targetTileY = Math.floor(targetY / this.tileMap.tileHeight);
+    
+    // Check each tile on the map
+    for (let y = 0; y < this.tileMap.height; y++) {
+      for (let x = 0; x < this.tileMap.width; x++) {
+        // Convert tile to world position
+        const worldX = x * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
+        const worldY = y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
+        
+        // Check if this position is valid for the soul
+        if (this.isValidPosition(worldX, worldY, teamType)) {
+          const distance = Math.sqrt((worldX - targetX) ** 2 + (worldY - targetY) ** 2);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            bestPosition = { x: worldX, y: worldY };
+          }
+        }
+      }
+    }
+    
+    return bestPosition; // Return closest valid position found (or null if none)
   }
 
   /**

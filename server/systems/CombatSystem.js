@@ -176,6 +176,12 @@ class CombatSystem {
         wasDestroyed: wasDestroyed,
         nexusHealth: enemyNexus.currentHealth
       });
+
+      // Immediately broadcast nexus health update for real-time UI
+      this.attackEvents.push({
+        type: 'nexus_update',
+        nexus: enemyNexus.serialize()
+      });
       
       // If nexus was destroyed, trigger victory condition
       if (wasDestroyed) {

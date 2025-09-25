@@ -253,7 +253,7 @@ class GameManager {
     // Update all souls
     this.souls.forEach(soul => {
       soul.update(this.souls);
-      soul.updateFallbackCasting(); // Track seeking time for fallback casting
+     // soul.updateFallbackCasting(); // Track seeking time for fallback casting
     });
 
     // Remove dead souls
@@ -362,6 +362,66 @@ class GameManager {
           }
         });
       }
+    });
+    
+    // Clean up orbs that are now in enemy territory
+    this.cleanupOrbsInEnemyTerritory();
+  }
+
+  /**
+   * Remove energy orbs that are now in enemy territory after tile captures
+   */
+  cleanupOrbsInEnemyTerritory() {
+    const orbsToRemove = [];
+    
+    this.energyOrbs.forEach((orb, orbId) => {
+      // Skip orbs that are already collected (have respawn time)
+      if (orb.respawnTime > 0) return;
+      
+      // Check if orb is still in friendly territory
+      const orbTileX = Math.floor(orb.x / this.tileMap.tileWidth);
+      const orbTileY = Math.floor(orb.y / this.tileMap.tileHeight);
+      
+      // Check if coordinates are valid
+      if (orbTileX < 0 || orbTileX >= this.tileMap.width || 
+          orbTileY < 0 || orbTileY >= this.tileMap.height) {
+        orbsToRemove.push(orbId);
+        return;
+      }
+      
+      const tile = this.tileMap.tiles[orbTileY][orbTileX];
+      const opponentType = orb.teamType === 'green' ? 'gray' : 'green';
+      
+      // If orb is now in enemy territory, remove it
+      if (tile && tile.type === opponentType) {
+        orbsToRemove.push(orbId);
+      }
+      
+      // Also check nearby tiles for enemy presence (buffer zone)
+      const buffer = GameConfig.SPAWN.SAFE_DISTANCE_FROM_BORDER;
+      let isInDangerZone = false;
+      
+      for (let checkY = Math.max(0, orbTileY - buffer); checkY <= Math.min(this.tileMap.height - 1, orbTileY + buffer) && !isInDangerZone; checkY++) {
+        for (let checkX = Math.max(0, orbTileX - buffer); checkX <= Math.min(this.tileMap.width - 1, orbTileX + buffer) && !isInDangerZone; checkX++) {
+          const checkTile = this.tileMap.tiles[checkY][checkX];
+          if (checkTile && checkTile.type === opponentType) {
+            isInDangerZone = true;
+          }
+        }
+      }
+      
+      if (isInDangerZone) {
+        orbsToRemove.push(orbId);
+      }
+    });
+    
+    // Remove the orbs and broadcast the removal
+    orbsToRemove.forEach(orbId => {
+      this.energyOrbs.delete(orbId);
+      this.gameEvents.push({
+        type: 'orb_removed',
+        orbId: orbId
+      });
     });
   }
 

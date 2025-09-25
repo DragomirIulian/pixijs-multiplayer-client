@@ -13,7 +13,8 @@ const SoulStates = {
   CASTING: 'casting',
   DEFENDING: 'defending',  // Moving toward enemy to attack
   ATTACKING: 'attacking',  // Stopped and attacking
-  ATTACKING_NEXUS: 'attacking_nexus', // Moving toward and attacking enemy nexus
+  SEEKING_NEXUS: 'seeking_nexus', // Moving toward enemy nexus
+  ATTACKING_NEXUS: 'attacking_nexus', // Close to nexus and attacking it
   SOCIALISING: 'socialising',
   RESTING: 'resting',
   MATING: 'mating'
@@ -72,6 +73,10 @@ class SoulStateMachine {
         
       case SoulStates.SEEKING:
         this.handleSeekingState(energyPercentage, allSouls);
+        break;
+
+      case SoulStates.SEEKING_NEXUS:
+        this.handleSeekingNexusState(energyPercentage, allSouls);
         break;
 
       case SoulStates.ATTACKING_NEXUS:
@@ -140,9 +145,9 @@ class SoulStateMachine {
     //   return;
     // }
 
-    // Check if should attack enemy nexus (high priority - when close and healthy)
-    if (this.shouldAttackNexus(energyPercentage, allSouls)) {
-      this.transitionTo(SoulStates.ATTACKING_NEXUS);
+    // Check if should seek enemy nexus (high priority - when no targets available)
+    if (this.shouldSeekNexus(energyPercentage, allSouls)) {
+      this.transitionTo(SoulStates.SEEKING_NEXUS);
       return;
     }
 
@@ -155,8 +160,15 @@ class SoulStateMachine {
     ).length;
     
     if (allowedSeekingSouls > 0 && currentlySeekingSouls < allowedSeekingSouls && this.shouldSeekToCast(energyPercentage)) {
-      this.transitionTo(SoulStates.SEEKING);
-      return;
+      // Before seeking, check if there are any valid targets at all
+      if (this.hasValidCastingTargets()) {
+        this.transitionTo(SoulStates.SEEKING);
+        return;
+      } else {
+        // No valid casting targets available, seek nexus instead
+        this.transitionTo(SoulStates.SEEKING_NEXUS);
+        return;
+      }
     }
 
     // Check if should mate (when not in survival mode)
@@ -225,9 +237,17 @@ class SoulStateMachine {
       return;
     }
 
-    // If seeking for too long, give up and return to roaming
+    // If seeking for too long, check if we should attack nexus as fallback
     const timeInState = Date.now() - this.stateStartTime;
     if (timeInState > GameConfig.SOUL.SEEKING_TIMEOUT) {
+      // Check if there are any valid casting targets anywhere on the map
+      if (!this.hasValidCastingTargets()) {
+        // No valid targets available, switch to seeking nexus
+        this.transitionTo(SoulStates.SEEKING_NEXUS);
+        return;
+      }
+      
+      // Otherwise return to roaming
       this.transitionTo(SoulStates.ROAMING);
       return;
     }
@@ -551,26 +571,47 @@ class SoulStateMachine {
   }
 
   /**
-   * Check if soul should attack enemy nexus
-   * Triggers when: 1) No valid tiles available (score > 0), OR 2) Close to nexus with clear path
+   * Check if soul should seek enemy nexus
+   * Triggers when: No valid tiles available for casting
    */
-  shouldAttackNexus(energyPercentage, allSouls) {
-    // Check if there's a path to enemy nexus
+  shouldSeekNexus(energyPercentage, allSouls) {
+    // Check if there are NO valid tiles available for casting
+    const hasValidTilesAvailable = this.hasValidCastingTargets();
+    return !hasValidTilesAvailable;
+  }
+
+  /**
+   * Handle SEEKING_NEXUS state behavior - move towards enemy nexus
+   */
+  handleSeekingNexusState(energyPercentage, allSouls) {
+    // Switch to hungry if energy is too low
+    if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
+      this.transitionTo(SoulStates.HUNGRY);
+      return;
+    }
+
+    // Check if valid casting targets became available - switch back to seeking
+    if (this.hasValidCastingTargets()) {
+      this.transitionTo(SoulStates.SEEKING);
+      return;
+    }
+
+    // Check if close enough to nexus to start attacking
     const enemyNexusPos = this.soul.type === GameConfig.SOUL_TYPES.DARK ? 
       GameConfig.NEXUS.LIGHT_NEXUS : GameConfig.NEXUS.DARK_NEXUS;
     
     const nexusWorldX = enemyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
     const nexusWorldY = enemyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
     
-    // NEW CONDITION: Check if there are NO valid tiles available for casting
-    const hasValidTilesAvailable = this.hasValidCastingTargets();
-    if (!hasValidTilesAvailable) {
-      // No tiles to cast on - attack nexus as fallback
-      return this.hasPathToNexus(nexusWorldX, nexusWorldY);
-    }
+    const distanceToNexus = this.soul.getDistanceTo({ x: nexusWorldX, y: nexusWorldY });
     
-    // ORIGINAL CONDITION: Attack if close to nexus with clear path
-    return this.hasPathToNexus(nexusWorldX, nexusWorldY);
+    // If close enough to attack, switch to attacking nexus
+    if (distanceToNexus <= GameConfig.SOUL.ATTACK_RANGE) {
+      this.transitionTo(SoulStates.ATTACKING_NEXUS);
+      return;
+    }
+
+    // Continue seeking nexus (MovementSystem will handle movement)
   }
 
   /**

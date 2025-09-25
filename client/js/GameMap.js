@@ -11,17 +11,25 @@ export class GameMap {
         this.container = new Container();
         this.tileContainer = new Container();
         this.scoreContainer = new Container();
+        this.axisContainer = new Container();
         this.tileMap = null;
         this.grayTileTexture = null;
         this.greenTileTexture = null;
         this.borderScores = null;
         this.showScores = true; // Debug mode toggle
+        this.showAxis = true; // Coordinate axis toggle
     }
 
     async createMap() {
         await this.loadTileTextures();
         this.container.addChild(this.tileContainer);
         this.container.addChild(this.scoreContainer);
+        this.container.addChild(this.axisContainer);
+        
+        // Make sure axis renders on top of everything
+        this.axisContainer.zIndex = 1000;
+        
+        this.createCoordinateAxis();
     }
 
     async loadTileTextures() {
@@ -171,12 +179,75 @@ export class GameMap {
         }
     }
 
+    createCoordinateAxis() {
+        if (!this.showAxis) return;
+        
+        // Clear existing axis
+        this.axisContainer.removeChildren();
+        
+        // Get map dimensions from ClientConfig
+        const mapWidth = ClientConfig.CANVAS.WIDTH;
+        const mapHeight = ClientConfig.CANVAS.HEIGHT;
+        
+        // Style for axis labels
+        const axisStyle = new TextStyle({
+            fontSize: 12,
+            fill: 0xFFFFFF, // White text
+            fontWeight: 'bold',
+            stroke: 0x000000, // Black outline for visibility
+            strokeThickness: 2
+        });
+        
+        // Create X-axis labels (top and bottom edges)
+        for (let x = 0; x <= mapWidth; x += 25) {
+            // Top edge
+            const topLabel = new Text(x.toString(), axisStyle);
+            topLabel.anchor.set(0.5, 0); // Center horizontally, top align
+            topLabel.x = x;
+            topLabel.y = 5; // Just inside the map
+            this.axisContainer.addChild(topLabel);
+            
+            // Bottom edge
+            const bottomLabel = new Text(x.toString(), axisStyle);
+            bottomLabel.anchor.set(0.5, 1); // Center horizontally, bottom align
+            bottomLabel.x = x;
+            bottomLabel.y = mapHeight - 5; // Just inside the map
+            this.axisContainer.addChild(bottomLabel);
+        }
+        
+        // Create Y-axis labels (left and right edges)
+        for (let y = 0; y <= mapHeight; y += 25) {
+            // Left edge
+            const leftLabel = new Text(y.toString(), axisStyle);
+            leftLabel.anchor.set(0, 0.5); // Left align, center vertically
+            leftLabel.x = 5; // Just inside the map
+            leftLabel.y = y;
+            this.axisContainer.addChild(leftLabel);
+            
+            // Right edge
+            const rightLabel = new Text(y.toString(), axisStyle);
+            rightLabel.anchor.set(1, 0.5); // Right align, center vertically
+            rightLabel.x = mapWidth - 5; // Just inside the map
+            rightLabel.y = y;
+            this.axisContainer.addChild(rightLabel);
+        }
+    }
+
     toggleScoreDisplay() {
         this.showScores = !this.showScores;
         if (this.showScores) {
             this.updateScoreDisplay();
         } else {
             this.scoreContainer.removeChildren();
+        }
+    }
+
+    toggleAxisDisplay() {
+        this.showAxis = !this.showAxis;
+        if (this.showAxis) {
+            this.createCoordinateAxis();
+        } else {
+            this.axisContainer.removeChildren();
         }
     }
 }

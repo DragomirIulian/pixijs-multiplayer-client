@@ -97,7 +97,7 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 10,
+    SOULS_PER_TEAM: 20,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
