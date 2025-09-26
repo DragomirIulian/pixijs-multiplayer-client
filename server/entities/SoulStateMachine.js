@@ -237,17 +237,17 @@ class SoulStateMachine {
       return;
     }
 
-    // If seeking for too long, check if we should attack nexus as fallback
+    // Check if there are any valid casting targets available immediately
+    if (!this.hasValidCastingTargets()) {
+      // No valid targets available, switch to seeking nexus immediately
+      this.transitionTo(SoulStates.SEEKING_NEXUS);
+      return;
+    }
+    
+    // If seeking for too long, return to roaming (but this shouldn't happen if valid targets exist)
     const timeInState = Date.now() - this.stateStartTime;
     if (timeInState > GameConfig.SOUL.SEEKING_TIMEOUT) {
-      // Check if there are any valid casting targets anywhere on the map
-      if (!this.hasValidCastingTargets()) {
-        // No valid targets available, switch to seeking nexus
-        this.transitionTo(SoulStates.SEEKING_NEXUS);
-        return;
-      }
-      
-      // Otherwise return to roaming
+      // Fallback to roaming if somehow still seeking after timeout
       this.transitionTo(SoulStates.ROAMING);
       return;
     }
@@ -652,14 +652,14 @@ class SoulStateMachine {
     
     // TEMPORARILY RELAXED: Just check distance, ignore path requirements
     // This allows souls to attack nexus more easily for testing
-    const maxDistance = GameConfig.NEXUS.MAX_ATTACK_DISTANCE * 2; // Double the range
+    const maxDistance = GameConfig.SOUL.ATTACK_RANGE; // Use standard attack range
     
-    // Calculate straight-line distance
-    const dx = Math.abs(nexusTileX - soulTileX);
-    const dy = Math.abs(nexusTileY - soulTileY);
+    // Calculate straight-line distance in PIXELS
+    const dx = Math.abs(nexusWorldX - this.soul.x);
+    const dy = Math.abs(nexusWorldY - this.soul.y);
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // SIMPLIFIED: Just check if nexus is within extended range
+    // Check if nexus is within attack range (in pixels)
     return distance <= maxDistance;
     
     // ORIGINAL CODE (temporarily disabled):

@@ -54,6 +54,14 @@ class SpellSystem {
         if (this.movementSystem && this.movementSystem.updateBorderScores) {
           this.movementSystem.updateBorderScores();
         }
+        
+        // Force souls to re-evaluate their targets immediately after tile changes
+        allSouls.forEach(soul => {
+          if (soul.stateMachine && (soul.stateMachine.getCurrentState() === 'seeking' || soul.stateMachine.getCurrentState() === 'seeking_nexus')) {
+            // Reset seeking state to force target recalculation
+            soul.stateMachine.transitionTo('seeking');
+          }
+        });
 
         // Broadcast spell completion FIRST to stop animations
         completionEvents.push({
@@ -104,6 +112,17 @@ class SpellSystem {
       } else {
       }
     }
+    
+    // IMPORTANT: Revalidate prepare target if soul is still preparing
+    if (soul.isInState(SoulStates.PREPARING) && soul.prepareTarget) {
+      const tile = this.tileMap.tiles[soul.prepareTarget.y] && this.tileMap.tiles[soul.prepareTarget.y][soul.prepareTarget.x];
+      if (tile && tile.type === soul.teamType) {
+        // Target tile is now friendly - cancel preparation and go back to seeking
+        console.log(`Soul ${soul.id} cancelling preparation - target tile is now friendly`);
+        soul.prepareTarget = null;
+        soul.stateMachine.transitionTo('seeking');
+      }
+    }
 
     // Check if soul just entered CASTING state and needs to start spell
     // CRITICAL: Only start spell if soul doesn't already have an active spell
@@ -111,10 +130,19 @@ class SpellSystem {
       // Check if this soul already has an active spell
       const hasActiveSpell = Array.from(this.activeSpells.values()).some(spell => spell.casterId === soul.id);
       
-      if (!hasActiveSpell) {
+      // ALSO check if the prepared target is still valid (not already being targeted)
+      const isTargetStillValid = !Array.from(this.activeSpells.values()).some(spell => 
+        spell.targetTile.x === soul.prepareTarget.x && spell.targetTile.y === soul.prepareTarget.y
+      );
+      
+      if (!hasActiveSpell && isTargetStillValid) {
         this.startSpellCasting(soul, soul.prepareTarget, allSouls);
         // Clear the prepare target to prevent duplicate spell creation
         soul.prepareTarget = null;
+      } else if (!isTargetStillValid) {
+        // Target is no longer valid, go back to seeking
+        soul.prepareTarget = null;
+        soul.stateMachine.transitionTo('seeking');
       }
     }
   }
@@ -392,47 +420,42 @@ class SpellSystem {
   }
 
   /**
-   * Capture tiles in a 3x3 square (9 tiles total)
+   * Capture only the single target tile
    * @param {Object} centerTile - The target tile of the spell
    * @param {string} newTileType - The team type to convert tiles to
-   * @returns {Array} Array of captured tiles
+   * @returns {Array} Array of captured tiles (single tile)
    */
   captureTunnel(centerTile, newTileType) {
     const capturedTiles = [];
     
-    // 3x3 square pattern: center + all 8 surrounding tiles
-    const squarePattern = [
-      { x: -1, y: -1 }, // Top-left
-      { x: 0, y: -1 },  // Top-center
-      { x: 1, y: -1 },  // Top-right
-      { x: -1, y: 0 },  // Middle-left
-      { x: 0, y: 0 },   // Center
-      { x: 1, y: 0 },   // Middle-right
-      { x: -1, y: 1 },  // Bottom-left
-      { x: 0, y: 1 },   // Bottom-center
-      { x: 1, y: 1 }    // Bottom-right
-    ];
+    // Only capture the center tile
+    const tileX = centerTile.x;
+    const tileY = centerTile.y;
     
-    squarePattern.forEach(offset => {
-      const tileX = centerTile.x + offset.x;
-      const tileY = centerTile.y + offset.y;
+    // Check bounds
+    if (tileX >= 0 && tileX < this.tileMap.width && 
+        tileY >= 0 && tileY < this.tileMap.height) {
       
-      // Check bounds
-      if (tileX >= 0 && tileX < this.tileMap.width && 
-          tileY >= 0 && tileY < this.tileMap.height) {
+      const tile = this.tileMap.tiles[tileY][tileX];
+      if (tile && tile.type !== newTileType) {
+        tile.type = newTileType;
         
-        const tile = this.tileMap.tiles[tileY][tileX];
-        if (tile && tile.type !== newTileType) {
-          tile.type = newTileType;
-          capturedTiles.push({
-            x: tileX,
-            y: tileY,
-            worldX: tile.worldX,
-            worldY: tile.worldY
-          });
-        }
+        // Assign new variant for the conquered tile
+        const seed = tileX * 1000 + tileY; // Same seed logic as initial generation
+        const variants = newTileType === 'gray' ? 
+          GameConfig.TILE_COLLECTIONS.GRAY_TILES : 
+          GameConfig.TILE_COLLECTIONS.GREEN_TILES;
+        const variantIndex = seed % variants.length;
+        tile.variant = variants[variantIndex];
+        
+        capturedTiles.push({
+          x: tileX,
+          y: tileY,
+          worldX: tile.worldX,
+          worldY: tile.worldY
+        });
       }
-    });
+    }
     
     return capturedTiles;
   }

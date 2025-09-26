@@ -53,16 +53,32 @@ export class NexusManager {
         // Choose texture based on type
         const texture = nexusData.type === 'light' ? this.lightTexture : this.darkTexture;
         
-        // Create main nexus sprite - 8x8 tiles size (twice the previous 4x4)
+        // Create main nexus sprite - 2x2 tiles size for small map
         const nexusSprite = new Sprite(texture);
         nexusSprite.anchor.set(0.5);
         nexusSprite.x = 0;
         nexusSprite.y = 0;
-        // Scale to 8x8 tiles (8 * tileWidth = 8 * 20 = 160 pixels)
-        const NEXUS_SIZE_TILES = 8;
-        const TILE_WIDTH = ClientConfig.MAP.TILE_DISPLAY_WIDTH; // Use config instead of hardcoded value
-        nexusSprite.width = NEXUS_SIZE_TILES * TILE_WIDTH;
-        nexusSprite.height = NEXUS_SIZE_TILES * TILE_WIDTH;
+        // Scale to nexus size from server data ONLY
+        if (!nexusData.size) {
+            console.error('No nexus size provided by server');
+            return null;
+        }
+        
+        if (!nexusData.visualMultiplier) {
+            console.error('No visual multiplier provided by server');
+            return null;
+        }
+        
+        const visualSize = nexusData.size * nexusData.visualMultiplier;
+        const TILE_WIDTH = ClientConfig.MAP.TILE_DISPLAY_WIDTH;
+        const finalWidth = visualSize * TILE_WIDTH;
+        const finalHeight = visualSize * TILE_WIDTH;
+        
+        console.log(`Nexus ${nexusData.type}: size=${nexusData.size}, multiplier=${nexusData.visualMultiplier}, visualSize=${visualSize}, finalSize=${finalWidth}x${finalHeight}`);
+        console.log(`Original texture size: ${texture.width}x${texture.height}`);
+        
+        nexusSprite.width = finalWidth;
+        nexusSprite.height = finalHeight;
         
         // Create health bar container
         const healthBarContainer = new Container();

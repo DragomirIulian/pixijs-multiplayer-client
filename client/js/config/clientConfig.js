@@ -166,14 +166,14 @@ export const ClientConfig = {
 
   // Map/Tile configuration
   MAP: {
-    TILE_TEXTURE_WIDTH: 100,    // Use existing texture width
-    TILE_TEXTURE_HEIGHT: 60,    // Use existing texture height
-    TILE_DISPLAY_WIDTH: 20,     // Square tiles: 20x20 pixels (stretched from 100x60 texture)
-    TILE_DISPLAY_HEIGHT: 20,    // Square tiles: 20x20 pixels (stretched from 100x60 texture)
+    TILE_TEXTURE_WIDTH: 64,     // New tile texture width
+    TILE_TEXTURE_HEIGHT: 64,    // New tile texture height
+    TILE_DISPLAY_WIDTH: 64,     // Square tiles: 64x64 pixels
+    TILE_DISPLAY_HEIGHT: 64,    // Square tiles: 64x64 pixels
     
     // Calculated tile counts for 1500x900 resolution
-    TILES_WIDTH: 75,            // 1500 / 20 = 75 tiles wide
-    TILES_HEIGHT: 45            // 900 / 20 = 45 tiles high
+    TILES_WIDTH: 23,            // 1500 / 64 = 23.4 -> 23 tiles wide
+    TILES_HEIGHT: 14            // 900 / 64 = 14.06 -> 14 tiles high
   },
 
   // Day/Night cycle configuration

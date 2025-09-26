@@ -50,10 +50,20 @@ class GameManager {
       for (let x = 0; x < tilesWidth; x++) {
         // Vertical split: left half green, right half gray
         const tileType = x < tilesWidth / 2 ? 'green' : 'gray';
+        
+        // Assign specific tile variant (consistent for all clients)
+        const seed = x * 1000 + y; // Use position as seed for deterministic randomness
+        const variants = tileType === 'gray' ? 
+          GameConfig.TILE_COLLECTIONS.GRAY_TILES : 
+          GameConfig.TILE_COLLECTIONS.GREEN_TILES;
+        const variantIndex = seed % variants.length;
+        const specificVariant = variants[variantIndex];
+        
         row.push({
           x: x,
           y: y,
           type: tileType,
+          variant: specificVariant,
           worldX: x * tileWidth,
           worldY: y * tileHeight
         });

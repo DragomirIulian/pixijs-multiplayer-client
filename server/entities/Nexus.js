@@ -127,7 +127,9 @@ class Nexus {
       maxHealth: this.maxHealth,
       healthPercentage: this.getHealthPercentage(),
       isDestroyed: this.isDestroyed,
-      isActive: this.isActive
+      isActive: this.isActive,
+      size: GameConfig.NEXUS.SIZE_TILES,
+      visualMultiplier: GameConfig.NEXUS.VISUAL_MULTIPLIER
     };
   }
 }

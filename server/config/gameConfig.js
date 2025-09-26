@@ -11,8 +11,31 @@ const GameConfig = {
   },
   
   TILE_TYPES: {
+    // Base tile types (used by server logic)
     GRAY: 'gray',
-    GREEN: 'green'
+    GREEN: 'green',
+    
+    // Gray tile variants (used by client)
+    GRAY_01: 'gray-tile-01',
+    GRAY_02: 'gray-tile-02', 
+    GRAY_03: 'gray-tile-03',
+    GRAY_04: 'gray-tile-04',
+    GRAY_05: 'gray-tile-05',
+    GRAY_06: 'gray-tile-06',
+    
+    // Green tile variants (used by client)
+    GREEN_01: 'green-tile-01',
+    GREEN_02: 'green-tile-02',
+    GREEN_03: 'green-tile-03', 
+    GREEN_04: 'green-tile-04',
+    GREEN_05: 'green-tile-05',
+    GREEN_06: 'green-tile-06'
+  },
+  
+  // Tile collections for random selection
+  TILE_COLLECTIONS: {
+    GRAY_TILES: ['gray-tile-01', 'gray-tile-02', 'gray-tile-03', 'gray-tile-04', 'gray-tile-05', 'gray-tile-06'],
+    GREEN_TILES: ['green-tile-01', 'green-tile-02', 'green-tile-03', 'green-tile-04', 'green-tile-05', 'green-tile-06']
   },
   
   TEAM_TYPES: {
@@ -29,10 +52,10 @@ const GameConfig = {
 
   // Tile map configuration
   TILEMAP: {
-    WIDTH: 75,      // Updated to match 1500px / 20px = 75 tiles
-    HEIGHT: 45,     // Updated to match 900px / 20px = 45 tiles
-    TILE_WIDTH: 20, // Square tiles: 20x20 pixels
-    TILE_HEIGHT: 20 // Square tiles: 20x20 pixels
+    WIDTH: 23,      // Updated to match 1500px / 64px = 23.4 -> 23 tiles
+    HEIGHT: 14,     // Updated to match 900px / 64px = 14.06 -> 14 tiles
+    TILE_WIDTH: 64, // Square tiles: 64x64 pixels
+    TILE_HEIGHT: 64 // Square tiles: 64x64 pixels
   },
 
   // Soul configuration
@@ -156,24 +179,25 @@ const GameConfig = {
     REGENERATION_INTERVAL: 1000, // How often to regenerate health (ms)
     DESTRUCTION_DAMAGE: 100,     // Damage dealt when nexus is destroyed
     SPAWN_OFFSET_RANGE: 25,     // Random offset range for spawning around nexus
+    SIZE_TILES: 2,              // Nexus size in tiles (2x2)
+    VISUAL_MULTIPLIER: 1,     // Visual size multiplier for client rendering
     
-    // Positions (in tile coordinates) - Updated for 75x45 grid
+    // Positions (in tile coordinates) - Updated for 23x14 grid
     LIGHT_NEXUS: {
-      TILE_X: 6,                // Left bottom corner (proportionally adjusted)
-      TILE_Y: 33                // Bottom area (proportionally adjusted: 45*0.75 ≈ 33)
+      TILE_X: 3,                // Left side, more centered
+      TILE_Y: 11                 // Bottom area, within border bounds
     },
     DARK_NEXUS: {
-      TILE_X: 68,               // Right top corner (proportionally adjusted: 75*0.9 ≈ 68)
-      TILE_Y: 11                // Top area (proportionally adjusted: 45*0.25 ≈ 11)
+      TILE_X: 20,               // Right side, more centered  
+      TILE_Y: 3                 // Top area, within border bounds
     },
 
     // Combat and pathfinding
-    TUNNEL_WIDTH: 10,           // 10 tiles wide as requested (soul height limit)
+    TUNNEL_WIDTH: 2,           // 10 tiles wide as requested (soul height limit)
     TUNNEL_PRIORITY_MULTIPLIER: 2.0,  // How much to prioritize tunnel tiles
-    MAX_ATTACK_DISTANCE: 10,    // Maximum distance to consider for nexus attack
     
-    // Border scoring system
-    BORDER_WIDTH: 4             // 100 pixels = ~4 tiles (25px each)
+    // Border scoring system - tiles-based configuration
+    BORDER_WIDTH_TILES: 3     // Border width in tiles (will be multiplied by tile size)
   }
 };
 

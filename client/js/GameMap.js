@@ -13,8 +13,7 @@ export class GameMap {
         this.scoreContainer = new Container();
         this.axisContainer = new Container();
         this.tileMap = null;
-        this.grayTileTexture = null;
-        this.greenTileTexture = null;
+        this.tileTextures = new Map(); // Store all tile textures
         this.borderScores = null;
         this.showScores = true; // Debug mode toggle
         this.showAxis = true; // Coordinate axis toggle
@@ -33,13 +32,38 @@ export class GameMap {
     }
 
     async loadTileTextures() {
-        // Load tile textures using configuration values
-        this.grayTileTexture = await Assets.load(`./resources/background_gray_${ClientConfig.MAP.TILE_TEXTURE_WIDTH}x${ClientConfig.MAP.TILE_TEXTURE_HEIGHT}.png`);
-        this.greenTileTexture = await Assets.load(`./resources/background_green_${ClientConfig.MAP.TILE_TEXTURE_WIDTH}x${ClientConfig.MAP.TILE_TEXTURE_HEIGHT}.png`);
+        // Load all tile textures
+        const tileNames = [
+            'gray-tile-01', 'gray-tile-02', 'gray-tile-03', 'gray-tile-04', 'gray-tile-05', 'gray-tile-06',
+            'green-tile-01', 'green-tile-02', 'green-tile-03', 'green-tile-04', 'green-tile-05', 'green-tile-06'
+        ];
+        
+        for (const tileName of tileNames) {
+            try {
+                const texture = await Assets.load(`./resources/${tileName}-64x64.png`);
+                this.tileTextures.set(tileName, texture);
+                console.log(`Loaded texture: ${tileName}`);
+            } catch (error) {
+                console.error(`Failed to load texture: ${tileName}`, error);
+            }
+        }
+        
+        console.log(`Loaded ${this.tileTextures.size} tile textures`);
+    }
+    
+    // Helper function to get random tile texture for a team
+    getRandomTileTexture(teamType) {
+        const grayTiles = ['gray-tile-01', 'gray-tile-02', 'gray-tile-03', 'gray-tile-04', 'gray-tile-05', 'gray-tile-06'];
+        const greenTiles = ['green-tile-01', 'green-tile-02', 'green-tile-03', 'green-tile-04', 'green-tile-05', 'green-tile-06'];
+        
+        const tileOptions = teamType === 'gray' ? grayTiles : greenTiles;
+        const randomTile = tileOptions[Math.floor(Math.random() * tileOptions.length)];
+        
+        return this.tileTextures.get(randomTile);
     }
 
     updateTileMap(tileMapData, borderScores = null) {
-        if (!tileMapData || !this.grayTileTexture || !this.greenTileTexture) return;
+        if (!tileMapData || this.tileTextures.size === 0) return;
         
         // Clear existing tiles
         this.tileContainer.removeChildren();
@@ -50,20 +74,29 @@ export class GameMap {
             this.borderScores = borderScores;
         }
         
-        // Render tiles based on server data
+        // Render tiles based on server data with random variants
         for (let y = 0; y < tileMapData.height; y++) {
             for (let x = 0; x < tileMapData.width; x++) {
                 const tileData = tileMapData.tiles[y][x];
-                const texture = tileData.type === 'gray' ? this.grayTileTexture : this.greenTileTexture;
+                const texture = tileData.variant ? 
+                    this.tileTextures.get(tileData.variant) : 
+                    this.getRandomTileTexture(tileData.type); // Fallback for old data
                 
-                const tileSprite = new Sprite(texture);
-                tileSprite.x = tileData.worldX;
-                tileSprite.y = tileData.worldY;
-                // Scale the tiles down from texture size to display size
-                tileSprite.width = ClientConfig.MAP.TILE_DISPLAY_WIDTH;
-                tileSprite.height = ClientConfig.MAP.TILE_DISPLAY_HEIGHT;
+                if (!texture) {
+                    console.warn(`No texture found for variant: ${tileData.variant}, type: ${tileData.type}`);
+                }
                 
-                this.tileContainer.addChild(tileSprite);
+                if (texture) {
+                    const tileSprite = new Sprite(texture);
+                    tileSprite.x = tileData.worldX;
+                    tileSprite.y = tileData.worldY;
+                    tileSprite.width = ClientConfig.MAP.TILE_DISPLAY_WIDTH;
+                    tileSprite.height = ClientConfig.MAP.TILE_DISPLAY_HEIGHT;
+                    
+                    this.tileContainer.addChild(tileSprite);
+                } else {
+                    console.warn(`No texture found for tile type: ${tileData.type}`);
+                }
             }
         }
         
@@ -72,15 +105,17 @@ export class GameMap {
     }
 
     updateSingleTile(tileX, tileY, newType) {
-        if (!this.tileMap || !this.grayTileTexture || !this.greenTileTexture) return;
+        if (!this.tileMap || this.tileTextures.size === 0) return;
         
         // Find and update the specific tile sprite
         const tileIndex = tileY * this.tileMap.width + tileX;
         const tileSprite = this.tileContainer.getChildAt(tileIndex);
         
         if (tileSprite) {
-            const texture = newType === 'gray' ? this.grayTileTexture : this.greenTileTexture;
-            tileSprite.texture = texture;
+            const texture = this.getRandomTileTexture(newType);
+            if (texture) {
+                tileSprite.texture = texture;
+            }
         }
         
         // Update tile data
@@ -118,43 +153,26 @@ export class GameMap {
             strokeThickness: 1
         });
         
-        // Only display scores within the border rectangle area
-        // First, calculate border rectangle bounds (same logic as server)
-        const lightNexus = { TILE_X: 6, TILE_Y: 33 };  // Bottom-left nexus (updated for 75x45 grid)
-        const darkNexus = { TILE_X: 68, TILE_Y: 11 };   // Top-right nexus (updated for 75x45 grid)
+        // Get scores from server data
+        const scores = this.borderScores.scores || this.borderScores; // Handle both old and new format
         
-        // Calculate border width based on 100 pixels divided by tile dimensions
-        const borderWidthX = Math.ceil(100 / ClientConfig.MAP.TILE_DISPLAY_WIDTH);  // Horizontal border width in tiles
-        const borderWidthY = Math.ceil(100 / ClientConfig.MAP.TILE_DISPLAY_HEIGHT); // Vertical border width in tiles
+        if (!scores || !scores.green || !scores.gray) {
+            console.warn('No valid scores from server');
+            return;
+        }
         
-        // Create rectangle with nexuses sitting in the MIDDLE of the border width
-        const halfBorderX = Math.floor(borderWidthX / 2);
-        const halfBorderY = Math.floor(borderWidthY / 2);
-        
-        const borderRect = {
-            left: lightNexus.TILE_X - halfBorderX,     // Light nexus in middle of left border
-            top: darkNexus.TILE_Y - halfBorderY,      // Dark nexus in middle of top border
-            right: darkNexus.TILE_X + halfBorderX,    // Dark nexus in middle of right border
-            bottom: lightNexus.TILE_Y + halfBorderY   // Light nexus in middle of bottom border
-        };
-        
-        // Display scores in the 100px WIDE border path around the rectangle
-        for (let y = Math.max(0, borderRect.top); y <= Math.min(this.tileMap.height - 1, borderRect.bottom); y++) {
-            for (let x = Math.max(0, borderRect.left); x <= Math.min(this.tileMap.width - 1, borderRect.right); x++) {
-                // Show scores in the border path area (100px wide on each side)
-                const isInTopBorder = (y <= borderRect.top + borderWidthY);
-                const isInBottomBorder = (y >= borderRect.bottom - borderWidthY);
-                const isInLeftBorder = (x <= borderRect.left + borderWidthX);
-                const isInRightBorder = (x >= borderRect.right - borderWidthX);
+        // Display scores for ALL tiles that have non-zero values from server
+        for (let y = 0; y < this.tileMap.height; y++) {
+            for (let x = 0; x < this.tileMap.width; x++) {
+                // Check if this tile has any non-zero scores from server
+                const lightScore = scores.green[y] && scores.green[y][x];
+                const darkScore = scores.gray[y] && scores.gray[y][x];
                 
-                const isInBorderPath = (isInTopBorder || isInBottomBorder || isInLeftBorder || isInRightBorder);
-                
-                if (!isInBorderPath) continue; // Skip tiles outside the border path
+                if (lightScore === 0 && darkScore === 0) continue; // Skip tiles with all zero scores
                 
                 const tileData = this.tileMap.tiles[y][x];
                 
                 // Light team scores (green)
-                const lightScore = this.borderScores.green[y][x];
                 const lightText = new Text(lightScore.toString(), lightTeamStyle);
                 
                 // Center the light score in the top half of the tile
@@ -166,7 +184,6 @@ export class GameMap {
                 this.scoreContainer.addChild(lightText);
                 
                 // Dark team scores (gray)
-                const darkScore = this.borderScores.gray[y][x];
                 const darkText = new Text(darkScore.toString(), darkTeamStyle);
                 
                 // Center the dark score in the bottom half of the tile
@@ -198,56 +215,44 @@ export class GameMap {
             strokeThickness: 2
         });
         
-        // Create X-axis labels (top and bottom edges)
-        for (let x = 0; x <= mapWidth; x += 25) {
+        // Create X-axis labels (top and bottom edges) - tile-based coordinates
+        for (let tileX = 0; tileX < ClientConfig.MAP.TILES_WIDTH; tileX++) {
+            const worldX = tileX * ClientConfig.MAP.TILE_DISPLAY_WIDTH + ClientConfig.MAP.TILE_DISPLAY_WIDTH / 2;
+            
             // Top edge
-            const topLabel = new Text(x.toString(), axisStyle);
+            const topLabel = new Text(worldX.toString(), axisStyle);
             topLabel.anchor.set(0.5, 0); // Center horizontally, top align
-            topLabel.x = x;
+            topLabel.x = worldX;
             topLabel.y = 5; // Just inside the map
             this.axisContainer.addChild(topLabel);
             
             // Bottom edge
-            const bottomLabel = new Text(x.toString(), axisStyle);
+            const bottomLabel = new Text(worldX.toString(), axisStyle);
             bottomLabel.anchor.set(0.5, 1); // Center horizontally, bottom align
-            bottomLabel.x = x;
+            bottomLabel.x = worldX;
             bottomLabel.y = mapHeight - 5; // Just inside the map
             this.axisContainer.addChild(bottomLabel);
         }
         
-        // Create Y-axis labels (left and right edges)
-        for (let y = 0; y <= mapHeight; y += 25) {
+        // Create Y-axis labels (left and right edges) - tile-based coordinates
+        for (let tileY = 0; tileY < ClientConfig.MAP.TILES_HEIGHT; tileY++) {
+            const worldY = tileY * ClientConfig.MAP.TILE_DISPLAY_HEIGHT + ClientConfig.MAP.TILE_DISPLAY_HEIGHT / 2;
+            
             // Left edge
-            const leftLabel = new Text(y.toString(), axisStyle);
+            const leftLabel = new Text(worldY.toString(), axisStyle);
             leftLabel.anchor.set(0, 0.5); // Left align, center vertically
             leftLabel.x = 5; // Just inside the map
-            leftLabel.y = y;
+            leftLabel.y = worldY;
             this.axisContainer.addChild(leftLabel);
             
             // Right edge
-            const rightLabel = new Text(y.toString(), axisStyle);
+            const rightLabel = new Text(worldY.toString(), axisStyle);
             rightLabel.anchor.set(1, 0.5); // Right align, center vertically
             rightLabel.x = mapWidth - 5; // Just inside the map
-            rightLabel.y = y;
+            rightLabel.y = worldY;
             this.axisContainer.addChild(rightLabel);
         }
     }
 
-    toggleScoreDisplay() {
-        this.showScores = !this.showScores;
-        if (this.showScores) {
-            this.updateScoreDisplay();
-        } else {
-            this.scoreContainer.removeChildren();
-        }
-    }
 
-    toggleAxisDisplay() {
-        this.showAxis = !this.showAxis;
-        if (this.showAxis) {
-            this.createCoordinateAxis();
-        } else {
-            this.axisContainer.removeChildren();
-        }
-    }
 }

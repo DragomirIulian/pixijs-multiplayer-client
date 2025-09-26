@@ -26,8 +26,8 @@ class ScoringSystem {
     };
     
     // Calculate border dimensions
-    this.borderWidthX = Math.ceil(100 / GameConfig.TILEMAP.TILE_WIDTH);
-    this.borderWidthY = Math.ceil(100 / GameConfig.TILEMAP.TILE_HEIGHT);
+    this.borderWidthX = GameConfig.NEXUS.BORDER_WIDTH_TILES;
+    this.borderWidthY = GameConfig.NEXUS.BORDER_WIDTH_TILES;
     
     this.initializeScoring();
   }
@@ -111,18 +111,16 @@ class ScoringSystem {
     // Team-specific border restrictions
     if (teamType === 'green') {
       // Light team: ONLY top and left sides of rectangle
-      const isOnTopSide = (y <= this.borderRect.top + this.borderWidthY);
-      const isOnLeftSide = (x <= this.borderRect.left + this.borderWidthX);
+      const isOnTopSide = (y <= this.borderRect.top + GameConfig.NEXUS.SIZE_TILES);
       
-      if (!isOnTopSide && !isOnLeftSide) {
+      if (!isOnTopSide) {
         return 0; // Not on light team's assigned sides
       }
     } else {
       // Dark team: ONLY right and bottom sides of rectangle  
-      const isOnRightSide = (x >= this.borderRect.right - this.borderWidthX);
-      const isOnBottomSide = (y >= this.borderRect.bottom - this.borderWidthY);
+      const isOnBottomSide = (y >= this.borderRect.bottom -GameConfig.NEXUS.SIZE_TILES);
       
-      if (!isOnRightSide && !isOnBottomSide) {
+      if (!isOnBottomSide) {
         return 0; // Not on dark team's assigned sides
       }
     }
@@ -137,10 +135,10 @@ class ScoringSystem {
   }
 
   /**
-   * Check if a tile is occupied by a nexus (8x8 tile area)
+   * Check if a tile is occupied by a nexus (2x2 tile area)
    */
   isTileOccupiedByNexus(x, y, nexusConfig) {
-    const NEXUS_SIZE = 8; // 8x8 tiles
+    const NEXUS_SIZE = GameConfig.NEXUS.SIZE_TILES;
     const halfSize = Math.floor(NEXUS_SIZE / 2);
     
     const nexusLeft = nexusConfig.TILE_X - halfSize;
@@ -155,13 +153,13 @@ class ScoringSystem {
    * Get Manhattan distance to the closest tile of the enemy nexus
    */
   getDistanceToClosestNexusTile(x, y, nexusConfig) {
-    const NEXUS_SIZE = 8; // 8x8 tiles
+    const NEXUS_SIZE = GameConfig.NEXUS.SIZE_TILES;
     const halfSize = Math.floor(NEXUS_SIZE / 2);
     
     const nexusLeft = nexusConfig.TILE_X - halfSize;
-    const nexusRight = nexusConfig.TILE_X + halfSize - 1;
+    const nexusRight = nexusConfig.TILE_X + halfSize;
     const nexusTop = nexusConfig.TILE_Y - halfSize;
-    const nexusBottom = nexusConfig.TILE_Y + halfSize - 1;
+    const nexusBottom = nexusConfig.TILE_Y + halfSize;
     
     // Find the closest nexus tile
     const closestX = Math.max(nexusLeft, Math.min(nexusRight, x));
@@ -201,7 +199,14 @@ class ScoringSystem {
    * Get all border scores (used by GameManager for client updates)
    */
   getAllBorderScores() {
-    return this.borderScores;
+    return {
+      scores: this.borderScores,
+      borderRect: this.borderRect,
+      borderWidth: {
+        x: this.borderWidthX,
+        y: this.borderWidthY
+      }
+    };
   }
 
   /**
