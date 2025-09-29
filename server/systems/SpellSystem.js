@@ -118,7 +118,6 @@ class SpellSystem {
       const tile = this.tileMap.tiles[soul.prepareTarget.y] && this.tileMap.tiles[soul.prepareTarget.y][soul.prepareTarget.x];
       if (tile && tile.type === soul.teamType) {
         // Target tile is now friendly - cancel preparation and go back to seeking
-        console.log(`Soul ${soul.id} cancelling preparation - target tile is now friendly`);
         soul.prepareTarget = null;
         soul.stateMachine.transitionTo('seeking');
       }

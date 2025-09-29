@@ -302,7 +302,6 @@ class Soul {
       const fallbackThreshold = GameConfig.SOUL.SEEKING_TIMEOUT * 0.5; // 70% of seeking timeout
       if (seekingDuration > fallbackThreshold && !this.shouldUseFallbackCasting) {
         this.shouldUseFallbackCasting = true;
-        console.log(`Soul ${this.id} stuck for ${seekingDuration}ms, enabling fallback casting`);
       }
     } else {
       // Reset when not seeking
