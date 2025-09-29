@@ -32,13 +32,29 @@ export class GameMap {
     }
 
     async loadTileTextures() {
-        // Load all tile textures
-        const tileNames = [
+        // Load all tile textures including edge tiles
+        const baseTileNames = [
             'gray-tile-01', 'gray-tile-02', 'gray-tile-03', 'gray-tile-04', 'gray-tile-05', 'gray-tile-06',
             'green-tile-01', 'green-tile-02', 'green-tile-03', 'green-tile-04', 'green-tile-05', 'green-tile-06'
         ];
         
-        for (const tileName of tileNames) {
+        // Green edge tile names only (as requested)
+        const edgeTileNames = [
+            // Single edge tiles
+            'green-tile-left', 'green-tile-right', 'green-tile-top', 'green-tile-bottom',
+            // Corner edge tiles
+            'green-tile-top-left-bottom', 'green-tile-top-right-bottom',
+            'green-tile-leftbottom-lefttop', 'green-tile-rightbottom-righttop',
+            'green-tile-top-rightbottom', 'green-tile-bottom-righttop',
+            // Inner corner tiles (for green conquests)
+            'green-tile-inner-left-top', 'green-tile-inner-left-bottom', 'green-tile-inner-right-top', 'green-tile-inner-right-bottom',
+            // Outer corner tiles (for gray conquests affecting green neighbors)
+            'green-tile-outer-left-top', 'green-tile-outer-left-bottom', 'green-tile-outer-right-top', 'green-tile-outer-right-bottom'
+        ];
+        
+        const allTileNames = [...baseTileNames, ...edgeTileNames];
+        
+        for (const tileName of allTileNames) {
             try {
                 const texture = await Assets.load(`./resources/${tileName}-64x64.png`);
                 this.tileTextures.set(tileName, texture);
@@ -60,6 +76,189 @@ export class GameMap {
         return this.tileTextures.get(randomTile);
     }
 
+    /**
+     * Get the appropriate tile texture based on conquest state and neighboring tiles
+     * ONLY use green edge tiles when green territory is conquered
+     * @param {number} x - Tile X coordinate
+     * @param {number} y - Tile Y coordinate  
+     * @param {string} tileType - Current tile type ('gray' or 'green')
+     * @param {Object} tileMapData - Full tile map data
+     * @returns {Texture} The appropriate tile texture
+     */
+    getEdgeAwareTileTexture(x, y, tileType, tileMapData) {
+        // ONLY apply edge tiles for GREEN territories (conquered tiles)
+        if (tileType !== 'green') {
+            return this.getRandomTileTexture(tileType);
+        }
+        
+        // For green tiles, determine the appropriate tile based on corner logic
+        const edgeTileName = this.determineGreenTileType(x, y, tileMapData);
+        const texture = this.tileTextures.get(edgeTileName);
+        
+        if (texture) {
+            return texture;
+        } else {
+            console.warn(`Green edge tile not found: ${edgeTileName}, falling back to random green`);
+            return this.getRandomTileTexture(tileType);
+        }
+    }
+
+    /**
+     * Get the types of neighboring tiles (4-directional)
+     * @param {number} x - Tile X coordinate
+     * @param {number} y - Tile Y coordinate
+     * @param {Object} tileMapData - Full tile map data
+     * @returns {Array} Array of neighboring tile types
+     */
+    getNeighborTypes(x, y, tileMapData) {
+        const neighbors = [];
+        const directions = [
+            { dx: 0, dy: -1 }, // top
+            { dx: 1, dy: 0 },  // right  
+            { dx: 0, dy: 1 },  // bottom
+            { dx: -1, dy: 0 }  // left
+        ];
+        
+        for (const dir of directions) {
+            const nx = x + dir.dx;
+            const ny = y + dir.dy;
+            
+            if (nx >= 0 && nx < tileMapData.width && ny >= 0 && ny < tileMapData.height) {
+                neighbors.push(tileMapData.tiles[ny][nx].type);
+            } else {
+                // Treat out-of-bounds as neutral (don't affect edge detection)
+                neighbors.push(null);
+            }
+        }
+        
+        return neighbors;
+    }
+
+    /**
+     * Determine the appropriate GREEN tile type by checking ALL 8 neighbors
+     * @param {number} x - Tile X coordinate  
+     * @param {number} y - Tile Y coordinate
+     * @param {Object} tileMapData - Full tile map data
+     * @returns {string} The green tile name to use
+     */
+    determineGreenTileType(x, y, tileMapData) {
+        // Get all 8 neighbors: [top, topRight, right, bottomRight, bottom, bottomLeft, left, topLeft]
+        const allNeighbors = this.getAllNeighborTypes(x, y, tileMapData);
+        
+        const top = allNeighbors[0] === 'gray';
+        const topRight = allNeighbors[1] === 'gray';
+        const right = allNeighbors[2] === 'gray';
+        const bottomRight = allNeighbors[3] === 'gray';
+        const bottom = allNeighbors[4] === 'gray';
+        const bottomLeft = allNeighbors[5] === 'gray';
+        const left = allNeighbors[6] === 'gray';
+        const topLeft = allNeighbors[7] === 'gray';
+        
+        if(top && topRight && right && bottomRight && bottom) return 'green-tile-top-right-bottom';
+        if(top && topLeft && left && bottomLeft && bottom) return 'green-tile-top-left-bottom';
+        
+        if(topRight && bottomRight && !top && !right && !bottom) return 'green-tile-rightbottom-righttop';
+        if(bottomLeft && topLeft && !bottom && !left && !top) return 'green-tile-leftbottom-lefttop';
+        
+        if(top && !right && !bottom && !left && bottomRight) return 'green-tile-top-rightbottom';
+        if(bottom && !right && !top && !left && topRight) return 'green-tile-bottom-righttop';
+        // OUTER CORNERS: Two adjacent sides are gray
+        if (top && right) return 'green-tile-inner-right-top';
+        if (right && bottom) return 'green-tile-inner-right-bottom';
+        if (bottom && left) return 'green-tile-inner-left-bottom';
+        if (left && top) return 'green-tile-inner-left-top';
+        
+        // INNER CORNERS: Diagonal is gray but adjacent sides are not gray
+        if (topLeft && !top && !left) return 'green-tile-outer-right-bottom';
+        if (topRight && !top && !right) return 'green-tile-outer-left-bottom';
+        if (bottomRight && !bottom && !right) return 'green-tile-outer-left-top';
+        if (bottomLeft && !bottom && !left) return 'green-tile-outer-right-top';
+        
+        // SINGLE EDGES: Only one side is gray
+        if (top && !right && !bottom && !left) return 'green-tile-top';
+        if (right && !top && !bottom && !left) return 'green-tile-right';
+        if (bottom && !top && !right && !left) return 'green-tile-bottom';
+        if (left && !top && !right && !bottom) return 'green-tile-left';
+        
+        // COMPLEX CASES: Multiple sides (use first priority)
+        if (top) return 'green-tile-top';
+        if (right) return 'green-tile-right';
+        if (bottom) return 'green-tile-bottom';
+        if (left) return 'green-tile-left';
+        
+        // No gray neighbors, use random green tile
+        const baseTiles = ['green-tile-01', 'green-tile-02', 'green-tile-03', 'green-tile-04', 'green-tile-05', 'green-tile-06'];
+        return baseTiles[Math.floor(Math.random() * baseTiles.length)];
+    }
+
+    /**
+     * Get ALL 8 neighboring tiles systematically
+     * @param {number} x - Tile X coordinate
+     * @param {number} y - Tile Y coordinate
+     * @param {Object} tileMapData - Full tile map data
+     * @returns {Array} Array of all 8 neighbors: [top, topRight, right, bottomRight, bottom, bottomLeft, left, topLeft]
+     */
+    getAllNeighborTypes(x, y, tileMapData) {
+        const allNeighbors = [];
+        
+        // Check all 8 directions systematically, starting from top and going clockwise
+        const directions = [
+            { dx: 0, dy: -1 },  // top
+            { dx: 1, dy: -1 },  // top-right
+            { dx: 1, dy: 0 },   // right
+            { dx: 1, dy: 1 },   // bottom-right
+            { dx: 0, dy: 1 },   // bottom
+            { dx: -1, dy: 1 },  // bottom-left
+            { dx: -1, dy: 0 },  // left
+            { dx: -1, dy: -1 }  // top-left
+        ];
+        
+        for (const dir of directions) {
+            const nx = x + dir.dx;
+            const ny = y + dir.dy;
+            
+            if (nx >= 0 && nx < tileMapData.width && ny >= 0 && ny < tileMapData.height) {
+                allNeighbors.push(tileMapData.tiles[ny][nx].type);
+            } else {
+                // Treat out-of-bounds as neutral (not gray)
+                allNeighbors.push(null);
+            }
+        }
+        
+        return allNeighbors;
+    }
+
+    /**
+     * Get the types of diagonal neighboring tiles
+     * @param {number} x - Tile X coordinate
+     * @param {number} y - Tile Y coordinate
+     * @param {Object} tileMapData - Full tile map data
+     * @returns {Array} Array of diagonal neighboring tile types [topLeft, topRight, bottomRight, bottomLeft]
+     */
+    getDiagonalTypes(x, y, tileMapData) {
+        const diagonals = [];
+        const directions = [
+            { dx: -1, dy: -1 }, // top-left
+            { dx: 1, dy: -1 },  // top-right  
+            { dx: 1, dy: 1 },   // bottom-right
+            { dx: -1, dy: 1 }   // bottom-left
+        ];
+        
+        for (const dir of directions) {
+            const nx = x + dir.dx;
+            const ny = y + dir.dy;
+            
+            if (nx >= 0 && nx < tileMapData.width && ny >= 0 && ny < tileMapData.height) {
+                diagonals.push(tileMapData.tiles[ny][nx].type);
+            } else {
+                // Treat out-of-bounds as neutral
+                diagonals.push(null);
+            }
+        }
+        
+        return diagonals;
+    }
+
     updateTileMap(tileMapData, borderScores = null) {
         if (!tileMapData || this.tileTextures.size === 0) return;
         
@@ -72,17 +271,13 @@ export class GameMap {
             this.borderScores = borderScores;
         }
         
-        // Render tiles based on server data with random variants
+        // Render tiles with edge-aware texture selection
         for (let y = 0; y < tileMapData.height; y++) {
             for (let x = 0; x < tileMapData.width; x++) {
                 const tileData = tileMapData.tiles[y][x];
-                const texture = tileData.variant ? 
-                    this.tileTextures.get(tileData.variant) : 
-                    this.getRandomTileTexture(tileData.type); // Fallback for old data
                 
-                if (!texture) {
-                    console.warn(`No texture found for variant: ${tileData.variant}, type: ${tileData.type}`);
-                }
+                // Use edge-aware texture selection for better visual borders
+                const texture = this.getEdgeAwareTileTexture(x, y, tileData.type, tileMapData);
                 
                 if (texture) {
                     const tileSprite = new Sprite(texture);
@@ -93,7 +288,7 @@ export class GameMap {
                     
                     this.tileContainer.addChild(tileSprite);
                 } else {
-                    console.warn(`No texture found for tile type: ${tileData.type}`);
+                    console.warn(`No texture found for tile type: ${tileData.type} at position (${x}, ${y})`);
                 }
             }
         }
@@ -105,22 +300,61 @@ export class GameMap {
     updateSingleTile(tileX, tileY, newType) {
         if (!this.tileMap || this.tileTextures.size === 0) return;
         
+        // Update tile data first
+        this.tileMap.tiles[tileY][tileX].type = newType;
+        
+        // Get edge-aware texture for the conquered tile
+        const texture = this.getEdgeAwareTileTexture(tileX, tileY, newType, this.tileMap);
+        
         // Find and update the specific tile sprite
         const tileIndex = tileY * this.tileMap.width + tileX;
         const tileSprite = this.tileContainer.getChildAt(tileIndex);
         
-        if (tileSprite) {
-            const texture = this.getRandomTileTexture(newType);
-            if (texture) {
-                tileSprite.texture = texture;
-            }
+        if (tileSprite && texture) {
+            tileSprite.texture = texture;
         }
         
-        // Update tile data
-        this.tileMap.tiles[tileY][tileX].type = newType;
+        // Update neighboring tiles that might need different edge textures now
+        this.updateNeighborTiles(tileX, tileY);
         
         // Update score display
         this.updateScoreDisplay();
+    }
+
+    /**
+     * Update neighboring tiles after a conquest to ensure proper edge textures
+     * Updates up to 5 green neighbors plus diagonals as corners can affect a wider area
+     * @param {number} centerX - X coordinate of the changed tile
+     * @param {number} centerY - Y coordinate of the changed tile
+     */
+    updateNeighborTiles(centerX, centerY) {
+        // Update in a 3x3 grid around the changed tile to handle all corner cases
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                // Skip the center tile (already updated)
+                if (dx === 0 && dy === 0) continue;
+                
+                const nx = centerX + dx;
+                const ny = centerY + dy;
+                
+                // Check bounds
+                if (nx >= 0 && nx < this.tileMap.width && ny >= 0 && ny < this.tileMap.height) {
+                    const neighborTile = this.tileMap.tiles[ny][nx];
+                    
+                    // Only update green tiles (they're the ones that use edge tiles)
+                    if (neighborTile.type === 'green') {
+                        const neighborTexture = this.getEdgeAwareTileTexture(nx, ny, neighborTile.type, this.tileMap);
+                        
+                        const neighborIndex = ny * this.tileMap.width + nx;
+                        const neighborSprite = this.tileContainer.getChildAt(neighborIndex);
+                        
+                        if (neighborSprite && neighborTexture) {
+                            neighborSprite.texture = neighborTexture;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     updateBorderScores(borderScores) {
