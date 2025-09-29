@@ -23,7 +23,15 @@ export const ClientConfig = {
     SCALE: 0.08,
     INTERPOLATION_SPEED: 0.1,
     FLOATING_AMPLITUDE: 5,
-    FLOATING_SPEED: 0.02
+    FLOATING_SPEED: 0.02,
+    
+    // Shadow configuration
+    SHADOW_ENABLED: true,
+    SHADOW_SCALE: 0.8,          // Shadow is 80% the size of character
+    SHADOW_ALPHA: 0.3,          // Shadow transparency
+    SHADOW_OFFSET_X: 2,         // Horizontal shadow offset
+    SHADOW_OFFSET_Y: 30,        // Vertical shadow offset (below character)
+    SHADOW_COLOR: 0x000000      // Black shadow
   },
 
   // UI configuration

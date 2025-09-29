@@ -47,7 +47,7 @@ const GameConfig = {
   WORLD: {
     WIDTH: 1500,
     HEIGHT: 900,
-    BOUNDARY_BUFFER: 10
+    BOUNDARY_BUFFER: 30
   },
 
   // Tile map configuration

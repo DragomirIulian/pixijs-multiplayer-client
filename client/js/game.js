@@ -88,11 +88,13 @@ export class Game {
     }
 
     setupManagers() {
+        // Initialize day/night manager first
+        this.dayNightManager = new DayNightManager(this.app, this.gameMap);
+        
         // Initialize managers with focused responsibilities
-        this.characterManager = new CharacterManager(this.app, this.characterCard);
+        this.characterManager = new CharacterManager(this.app, this.characterCard, this.dayNightManager);
         this.energyOrbManager = new EnergyOrbManager(this.app);
         this.spellManager = new SpellManager(this.app);
-        this.dayNightManager = new DayNightManager(this.app, this.gameMap);
         
         // Initialize nexus manager
         this.nexusManager = new NexusManager(this.app);

@@ -6,15 +6,21 @@ import { ClientConfig } from '../config/clientConfig.js';
  * Handles spawning, updating, removing characters
  */
 export class CharacterManager {
-    constructor(app, characterCard) {
+    constructor(app, characterCard, dayNightManager = null) {
         this.app = app;
         this.characterCard = characterCard;
+        this.dayNightManager = dayNightManager;
         this.characters = new Map();
     }
 
     async spawnCharacter(characterData) {
-        const character = new Character(this.app, characterData);
+        const character = new Character(this.app, characterData, this.dayNightManager);
         await character.init();
+        
+        // Add shadow sprite to stage first (behind character)
+        if (character.shadowSprite) {
+            this.app.stage.addChild(character.shadowSprite);
+        }
         
         // Set up click detection for this character
         character.sprite.interactive = true;
@@ -45,7 +51,18 @@ export class CharacterManager {
                 this.characterCard.hide();
             }
             
-            this.app.stage.removeChild(character.sprite);
+            // Remove character sprite
+            if (character.sprite) {
+                this.app.stage.removeChild(character.sprite);
+            }
+            
+            // Remove shadow sprite
+            if (character.shadowSprite) {
+                this.app.stage.removeChild(character.shadowSprite);
+            }
+            
+            // Clean up character resources
+            character.destroy();
             this.characters.delete(characterId);
         }
     }
@@ -55,6 +72,10 @@ export class CharacterManager {
             if (character.sprite) {
                 this.app.stage.removeChild(character.sprite);
             }
+            if (character.shadowSprite) {
+                this.app.stage.removeChild(character.shadowSprite);
+            }
+            character.destroy();
         });
         this.characters.clear();
     }

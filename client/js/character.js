@@ -2,8 +2,9 @@ import { Assets, Sprite } from 'https://unpkg.com/pixi.js@8.13.0/dist/pixi.min.m
 import { ClientConfig } from './config/clientConfig.js';
 
 export class Character {
-    constructor(app, characterData) {
+    constructor(app, characterData, dayNightManager = null) {
         this.app = app;
+        this.dayNightManager = dayNightManager;
         this.id = characterData.id;
         this.name = characterData.name;
         this.type = characterData.type;
@@ -48,12 +49,24 @@ export class Character {
         
         
         this.sprite = null;
+        this.shadowSprite = null;
     }
 
     async init() {
         // Load the kryon texture based on current state
         const kryonImagePath = this.getKryonImagePath();
         const texture = await Assets.load(kryonImagePath);
+        
+        // Create shadow sprite first (renders behind character)
+        if (ClientConfig.CHARACTER.SHADOW_ENABLED) {
+            this.shadowSprite = new Sprite(texture);
+            this.shadowSprite.anchor.set(0.5);
+            this.shadowSprite.tint = ClientConfig.CHARACTER.SHADOW_COLOR;
+            this.shadowSprite.alpha = ClientConfig.CHARACTER.SHADOW_ALPHA;
+            this.shadowSprite.zIndex = 9; // Render behind character but above tiles
+            this.updateShadowScale();
+            this.updateShadowPosition();
+        }
         
         // Create a sprite
         this.sprite = new Sprite(texture);
@@ -171,6 +184,39 @@ export class Character {
         const currentScale = minScale + (maxScale - minScale) * this.maturityPercentage;
         
         this.sprite.scale.set(currentScale);
+        
+        // Update shadow scale as well
+        this.updateShadowScale();
+    }
+
+    updateShadowScale() {
+        if (!this.shadowSprite) return;
+        
+        // Calculate shadow scale based on character scale
+        const minScale = ClientConfig.CHARACTER.SCALE * 0.5;
+        const maxScale = ClientConfig.CHARACTER.SCALE;
+        const currentScale = minScale + (maxScale - minScale) * this.maturityPercentage;
+        const shadowScale = currentScale * ClientConfig.CHARACTER.SHADOW_SCALE;
+        
+        this.shadowSprite.scale.set(shadowScale, shadowScale * 0.5); // Make shadow flatter
+    }
+
+    updateShadowPosition(floatY = 0, rotationOffset = 0) {
+        if (!this.shadowSprite) return;
+        
+        // Position shadow relative to character with offset, following the floating and rotation animation
+        this.shadowSprite.x = this.x + ClientConfig.CHARACTER.SHADOW_OFFSET_X + rotationOffset;
+        this.shadowSprite.y = this.y + ClientConfig.CHARACTER.SHADOW_OFFSET_Y + floatY;
+    }
+
+    updateShadowVisibility() {
+        if (!this.shadowSprite || !this.dayNightManager) return;
+        
+        // Hide shadows during night and dusk (no light source)
+        const isNightTime = this.dayNightManager.currentPhase === 'night' || 
+                           this.dayNightManager.currentPhase === 'dusk';
+        
+        this.shadowSprite.visible = !isNightTime;
     }
 
     async updateSpriteForMaturation() {
@@ -216,9 +262,19 @@ export class Character {
         }
         const floatY = this.isDying ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
         
+        // Calculate rotation offset for shadow positioning using the EXACT same values as the soul
+        const rotationAmount = this.isDying ? 0 : Math.sin(this.floatOffset * 2) * 0.2;
+        const rotationOffset = this.isDying ? 0 : -Math.sin(this.floatOffset * 2) * 5; // Scale up the rotation movement for visible shadow offset
+        
         // Update sprite position
         this.sprite.x = this.x;
         this.sprite.y = this.y + floatY;
+        
+        // Update shadow position (shadows follow the floating and rotation animation)
+        this.updateShadowPosition(floatY, rotationOffset);
+        
+        // Hide shadows during night time
+        this.updateShadowVisibility();
         
         // Apply visual tints for combat states (when using original soul images)
         if (!this.isDying) {
@@ -250,7 +306,7 @@ export class Character {
         
         // Add slight rotation for floating effect (but not when dying)
         if (!this.isDying) {
-            this.sprite.rotation = Math.sin(this.floatOffset * 2) * 0.1;
+            this.sprite.rotation = rotationAmount;
         }
     }
 
@@ -327,11 +383,29 @@ export class Character {
             try {
                 const newTexture = await Assets.load(newKryonImagePath);
                 this.sprite.texture = newTexture;
+                
+                // Update shadow texture as well
+                if (this.shadowSprite) {
+                    this.shadowSprite.texture = newTexture;
+                }
+                
                 this.currentKryonImage = newKryonImagePath;
             } catch (error) {
                 console.warn(`Failed to load kryon image: ${newKryonImagePath}`, error);
                 // Keep using current texture if load fails
             }
+        }
+    }
+
+    // Cleanup method for when character is removed
+    destroy() {
+        if (this.sprite) {
+            this.sprite.destroy();
+            this.sprite = null;
+        }
+        if (this.shadowSprite) {
+            this.shadowSprite.destroy();
+            this.shadowSprite = null;
         }
     }
 }
