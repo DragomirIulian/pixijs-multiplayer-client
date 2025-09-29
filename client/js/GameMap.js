@@ -43,9 +43,9 @@ export class GameMap {
             // Single edge tiles
             'green-tile-left', 'green-tile-right', 'green-tile-top', 'green-tile-bottom',
             // Corner edge tiles
-            'green-tile-left-top', 'green-tile-left-bottom', 'green-tile-right-top', 'green-tile-right-bottom',
             'green-tile-top-left-bottom', 'green-tile-top-right-bottom',
             'green-tile-leftbottom-lefttop', 'green-tile-rightbottom-righttop',
+            'green-tile-top-rightbottom', 'green-tile-bottom-righttop',
             // Inner corner tiles (for green conquests)
             'green-tile-inner-left-top', 'green-tile-inner-left-bottom', 'green-tile-inner-right-top', 'green-tile-inner-right-bottom',
             // Outer corner tiles (for gray conquests affecting green neighbors)
@@ -161,6 +161,9 @@ export class GameMap {
         
         if(topRight && bottomRight && !top && !right && !bottom) return 'green-tile-rightbottom-righttop';
         if(bottomLeft && topLeft && !bottom && !left && !top) return 'green-tile-leftbottom-lefttop';
+        
+        if(top && !right && !bottom && !left && bottomRight) return 'green-tile-top-rightbottom';
+        if(bottom && !right && !top && !left && topRight) return 'green-tile-bottom-righttop';
         // OUTER CORNERS: Two adjacent sides are gray
         if (top && right) return 'green-tile-inner-right-top';
         if (right && bottom) return 'green-tile-inner-right-bottom';
