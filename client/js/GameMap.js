@@ -28,7 +28,7 @@ export class GameMap {
         // Make sure axis renders on top of everything
         this.axisContainer.zIndex = 1000;
         
-        this.createCoordinateAxis();
+        this.updateAxisDisplay();
     }
 
     async loadTileTextures() {
@@ -42,13 +42,11 @@ export class GameMap {
             try {
                 const texture = await Assets.load(`./resources/${tileName}-64x64.png`);
                 this.tileTextures.set(tileName, texture);
-                console.log(`Loaded texture: ${tileName}`);
             } catch (error) {
                 console.error(`Failed to load texture: ${tileName}`, error);
             }
         }
         
-        console.log(`Loaded ${this.tileTextures.size} tile textures`);
     }
     
     // Helper function to get random tile texture for a team
@@ -130,11 +128,21 @@ export class GameMap {
         this.updateScoreDisplay();
     }
 
+    updateUIConfig(uiConfig) {
+        if (uiConfig && typeof uiConfig.SHOW_SCORING === 'boolean') {
+            this.showScores = uiConfig.SHOW_SCORING;
+            this.showAxis = uiConfig.SHOW_SCORING; // Also control axis display with same setting
+            this.updateScoreDisplay(); // Refresh score display with new setting
+            this.updateAxisDisplay(); // Refresh axis display with new setting
+        }
+    }
+
     updateScoreDisplay() {
-        if (!this.showScores || !this.borderScores || !this.tileMap) return;
-        
-        // Clear existing score displays
+        // Always clear existing score displays first
         this.scoreContainer.removeChildren();
+        
+        // If scores are disabled, just return after clearing
+        if (!this.showScores || !this.borderScores || !this.tileMap) return;
         
         // Create text styles for different teams
         const lightTeamStyle = new TextStyle({
@@ -196,12 +204,17 @@ export class GameMap {
         }
     }
 
-    createCoordinateAxis() {
-        if (!this.showAxis) return;
-        
-        // Clear existing axis
+    updateAxisDisplay() {
+        // Always clear existing axis displays first
         this.axisContainer.removeChildren();
         
+        // If axis is disabled, just return after clearing
+        if (!this.showAxis) return;
+        
+        this.createCoordinateAxis();
+    }
+
+    createCoordinateAxis() {
         // Get map dimensions from ClientConfig
         const mapWidth = ClientConfig.CANVAS.WIDTH;
         const mapHeight = ClientConfig.CANVAS.HEIGHT;

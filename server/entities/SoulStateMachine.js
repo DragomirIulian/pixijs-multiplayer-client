@@ -21,13 +21,18 @@ const SoulStates = {
 };
 
 class SoulStateMachine {
-  constructor(soul, tileMap = null, movementSystem = null) {
+  constructor(soul, tileMap = null, movementSystem = null, spellSystem = null) {
     this.soul = soul;
     this.tileMap = tileMap;
     this.movementSystem = movementSystem;
+    this.spellSystem = spellSystem;
     this.currentState = SoulStates.ROAMING;
     this.stateStartTime = Date.now();
-    this.lastCastTime = Date.now();
+    // Add variance to initial seeking cooldown to prevent all souls from seeking simultaneously
+    // Generate random variance between -25% and +25% of spell cooldown
+    const varianceRange = GameConfig.SOUL.SPELL_COOLDOWN * GameConfig.SOUL.SPELL_COOLDOWN_VARIANCE;
+    const seekingVariance = (Math.random() - 0.5) * 2 * varianceRange; // Range: -varianceRange to +varianceRange
+    this.lastCastTime = Date.now() - seekingVariance;
     this.defendingTarget = null;
     this.previousState = null;
   }
@@ -137,13 +142,12 @@ class SoulStateMachine {
       // The MatingSystem will coordinate and start mating for compatible pairs
     }
 
-    // TEMPORARILY REDUCED: Check if should defend (highest priority - overrides all except mating/resting)
+    // Check if should defend (highest priority - overrides all except mating/resting)
     // Only one soul should defend per casting enemy
-    // Reducing defense priority to allow more souls to attack nexus
-    // if (this.shouldBeDefender(allSouls)) {
-    //   this.transitionTo(SoulStates.DEFENDING);
-    //   return;
-    // }
+    if (this.shouldBeDefender(allSouls)) {
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
 
     // Check if should seek enemy nexus (high priority - when no targets available)
     if (this.shouldSeekNexus(energyPercentage, allSouls)) {
@@ -182,12 +186,11 @@ class SoulStateMachine {
   handleHungryState(energyPercentage, allSouls) {
     // Children cannot defend - only eat and roam
     if (!this.soul.isChild) {
-      // TEMPORARILY REDUCED: Check if should defend (overrides all) - only for adults
-      // Allowing more souls to focus on nexus attack instead of constant defense
-      // if (this.shouldBeDefender(allSouls)) {
-      //   this.transitionTo(SoulStates.DEFENDING);
-      //   return;
-      // }
+      // Check if should defend (overrides all) - only for adults
+      if (this.shouldBeDefender(allSouls)) {
+        this.transitionTo(SoulStates.DEFENDING);
+        return;
+      }
     }
 
     // Return to roaming when energy is above 50%
@@ -206,12 +209,11 @@ class SoulStateMachine {
       return;
     }
 
-    // TEMPORARILY DISABLED: Check if should defend (overrides all)
-    // Allowing souls to focus more on reaching nexus
-    // if (this.shouldBeDefender(allSouls)) {
-    //   this.transitionTo(SoulStates.DEFENDING);
-    //   return;
-    // }
+    // Check if should defend (overrides all)
+    if (this.shouldBeDefender(allSouls)) {
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
 
     // Check if should become hungry
     if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
@@ -624,12 +626,11 @@ class SoulStateMachine {
       return;
     }
 
-    // TEMPORARILY DISABLED: Check if should defend (overrides nexus attacking)
-    // Souls attacking nexus should stay focused on nexus, not get distracted by defense
-    // if (this.shouldBeDefender(allSouls)) {
-    //   this.transitionTo(SoulStates.DEFENDING);
-    //   return;
-    // }
+    // Check if should defend (overrides nexus attacking)
+    if (this.shouldBeDefender(allSouls)) {
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
 
     // Souls engage in attacking until they die - no retreat once attacking nexus
     // They will continue attacking or move towards nexus until eliminated
@@ -746,7 +747,7 @@ class SoulStateMachine {
     const teamType = this.soul.teamType;
     const opponentType = this.soul.type === GameConfig.SOUL_TYPES.DARK ? GameConfig.TILE_TYPES.GREEN : GameConfig.TILE_TYPES.GRAY;
     
-    // Check ALL tiles on the map for any with score > 0
+    // Check ALL tiles on the map for any with score > 0 AND not already targeted
     for (let y = 0; y < this.tileMap.height; y++) {
       for (let x = 0; x < this.tileMap.width; x++) {
         const tile = this.tileMap.tiles[y][x];
@@ -756,9 +757,16 @@ class SoulStateMachine {
           // Get score for this tile
           const score = this.movementSystem.scoringSystem.getBorderScore(x, y, teamType);
           
-          // If any tile has score > 0, there are valid targets
+          // If tile has score > 0, check if it's available (not already being targeted)
           if (score > 0) {
-            return true;
+            // Check if this tile is already being targeted by an active spell
+            const isAlreadyTargeted = this.spellSystem && Array.from(this.spellSystem.getActiveSpells().values()).some(spell => 
+              spell.targetTile.x === tile.worldX && spell.targetTile.y === tile.worldY
+            );
+            
+            if (!isAlreadyTargeted) {
+              return true; // Found at least one valid, available target
+            }
           }
         }
       }

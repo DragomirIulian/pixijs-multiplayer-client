@@ -22,8 +22,8 @@ export const ClientConfig = {
   CHARACTER: {
     SCALE: 0.08,
     INTERPOLATION_SPEED: 0.1,
-    FLOATING_AMPLITUDE: 3,
-    FLOATING_SPEED: 0.05
+    FLOATING_AMPLITUDE: 5,
+    FLOATING_SPEED: 0.02
   },
 
   // UI configuration

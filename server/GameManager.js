@@ -108,14 +108,14 @@ class GameManager {
       const darkNexus = this.nexuses.get('dark');
       const darkPos = darkNexus.getSpawnPosition();
       const darkSoulId = `dark-soul${i + 1}`;
-        const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap, false, this.movementSystem);
+        const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
       this.souls.set(darkSoulId, darkSoul);
 
       // Light souls spawn at light nexus
       const lightNexus = this.nexuses.get('light');
       const lightPos = lightNexus.getSpawnPosition();
       const lightSoulId = `light-soul${i + 1}`;
-        const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap, false, this.movementSystem);
+        const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
       this.souls.set(lightSoulId, lightSoul);
     }
   }
@@ -481,11 +481,11 @@ class GameManager {
     const currentLightSouls = Array.from(this.souls.values()).filter(s => s.type === 'light-soul' && s.isAdult()).length;
     
     // Emergency respawn if a team is extinct (no adult souls)
-    if (currentDarkSouls < 10 && this.souls.size > 0) {
+    if (currentDarkSouls < GameConfig.SPAWN.MIN_SOULS_PER_TEAM && this.souls.size > 0) {
       const id = `dark-soul-emergency-${Date.now()}`;
       const darkNexus = this.nexuses.get('dark');
       const spawnPos = darkNexus.getSpawnPosition();
-        const newSoul = new Soul(id, 'dark-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem);
+        const newSoul = new Soul(id, 'dark-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
       this.souls.set(id, newSoul);
       
       this.gameEvents.push({
@@ -500,11 +500,11 @@ class GameManager {
       });
     }
     
-    if (currentLightSouls < 10 && this.souls.size > 0) {
+    if (currentLightSouls < GameConfig.SPAWN.MIN_SOULS_PER_TEAM && this.souls.size > 0) {
       const id = `light-soul-emergency-${Date.now()}`;
       const lightNexus = this.nexuses.get('light');
       const spawnPos = lightNexus.getSpawnPosition();
-        const newSoul = new Soul(id, 'light-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem);
+        const newSoul = new Soul(id, 'light-soul', spawnPos.x, spawnPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
       this.souls.set(id, newSoul);
       
       this.gameEvents.push({

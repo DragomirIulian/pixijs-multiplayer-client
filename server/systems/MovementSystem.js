@@ -13,10 +13,19 @@ class MovementSystem {
     this.soulPositionHistory = new Map();
     this.stuckThreshold = 3; // How many updates to track for stuck detection
     this.stuckDistance = 20; // Distance threshold to consider soul stuck
+    
+    // Displacement system for territory changes
+    this.displacedSouls = new Map(); // soulId -> { gracePeriodEnd: timestamp, targetPosition: {x, y} }
+    this.gracePeriodDuration = 5000; // 5 seconds grace period
   }
 
   updateSoul(soul, allSouls, energyOrbs, movementMultiplier = 1.0) {
     if (!soul) return;
+
+    // Handle displaced souls first (highest priority)
+    if (this.handleDisplacedSoul(soul, movementMultiplier)) {
+      return; // Soul movement was handled by displacement system
+    }
 
     const soulState = soul.getCurrentState();
     
@@ -878,6 +887,9 @@ class MovementSystem {
         this.soulPositionHistory.delete(soulId);
       }
     }
+    
+    // Also clean up displacement data
+    this.cleanupDisplacementData(aliveSoulIds);
   }
 
   handleMatingMovement(soul, allSouls, movementMultiplier = 1.0) {
@@ -1044,6 +1056,121 @@ class MovementSystem {
   updateBorderScores() {
     // Delegate to the scoring system
     this.scoringSystem.updateScores();
+  }
+
+  /**
+   * Handle territory changes after spell completion
+   * Detects souls that are now in invalid positions and sets up relocation
+   */
+  handleTerritoryChange(capturedTiles, allSouls) {
+    if (!capturedTiles || capturedTiles.length === 0) return;
+
+    const now = Date.now();
+    
+    // Check each soul to see if they're now in an invalid position
+    allSouls.forEach(soul => {
+      // Skip if soul is already displaced
+      if (this.displacedSouls.has(soul.id)) return;
+      
+      // Check if soul's current position is now invalid
+      if (!this.isValidPosition(soul.x, soul.y, soul.getTeamType())) {
+        // Find the nearest valid position for this soul
+        const safePosition = this.findClosestValidPositionToTarget(soul, soul.x, soul.y);
+        
+        if (safePosition) {
+          // Mark soul as displaced with grace period
+          this.displacedSouls.set(soul.id, {
+            gracePeriodEnd: now + this.gracePeriodDuration,
+            targetPosition: safePosition,
+            originalPosition: { x: soul.x, y: soul.y }
+          });
+          
+          // If soul was casting/preparing, interrupt the action
+          if (soul.getCurrentState() === 'preparing' || soul.getCurrentState() === 'casting') {
+            soul.stateMachine.transitionTo('roaming');
+          }
+          
+          console.log(`Soul ${soul.id} displaced by territory change, relocating to safe zone`);
+        }
+      }
+    });
+  }
+
+  /**
+   * Handle movement for displaced souls during grace period
+   * Returns true if soul movement was handled, false otherwise
+   */
+  handleDisplacedSoul(soul, movementMultiplier = 1.0) {
+    const displacement = this.displacedSouls.get(soul.id);
+    if (!displacement) return false;
+
+    const now = Date.now();
+    
+    // Check if grace period has expired
+    if (now > displacement.gracePeriodEnd) {
+      this.displacedSouls.delete(soul.id);
+      return false;
+    }
+
+    // Move soul toward safe position
+    const target = displacement.targetPosition;
+    const dx = target.x - soul.x;
+    const dy = target.y - soul.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If soul has reached the safe zone, remove displacement
+    if (distance < 10) {
+      this.displacedSouls.delete(soul.id);
+      soul.setVelocity(0, 0);
+      console.log(`Soul ${soul.id} successfully relocated to safe zone`);
+      return false;
+    }
+
+    // Move toward safe position at normal speed
+    const speed = GameConfig.SOUL.MOVEMENT_SPEED * movementMultiplier;
+    soul.setVelocity(
+      (dx / distance) * speed,
+      (dy / distance) * speed
+    );
+
+    // Apply movement with special grace period rules
+    this.applyMovementWithGracePeriod(soul);
+    return true;
+  }
+
+  /**
+   * Apply movement for displaced souls, allowing them to move through barriers temporarily
+   */
+  applyMovementWithGracePeriod(soul) {
+    const newX = soul.x + soul.vx;
+    const newY = soul.y + soul.vy;
+
+    // During grace period, allow movement through territory barriers
+    // but still respect world boundaries
+    if (newX >= GameConfig.WORLD.BOUNDARY_BUFFER && 
+        newX <= GameConfig.WORLD.WIDTH - GameConfig.WORLD.BOUNDARY_BUFFER &&
+        newY >= GameConfig.WORLD.BOUNDARY_BUFFER && 
+        newY <= GameConfig.WORLD.HEIGHT - GameConfig.WORLD.BOUNDARY_BUFFER) {
+      
+      soul.x = newX;
+      soul.y = newY;
+    } else {
+      // Hit world boundary - handle normally
+      this.handleWorldBoundaries(soul);
+    }
+  }
+
+  /**
+   * Clean up displacement data for souls that no longer exist
+   */
+  cleanupDisplacementData(aliveSoulIds) {
+    const currentSoulIds = new Set(aliveSoulIds);
+    
+    for (const [soulId] of this.displacedSouls) {
+      if (!currentSoulIds.has(soulId)) {
+        this.displacedSouls.delete(soulId);
+      }
+    }
   }
 
 

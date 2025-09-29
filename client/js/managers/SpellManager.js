@@ -48,11 +48,8 @@ export class SpellManager {
         
         // Prevent duplicate spell creation
         if (this.activeSpells.has(spellData.spellId)) {
-            console.log(`[SpellManager] Spell ${spellData.spellId} already exists, skipping duplicate creation`);
             return;
         }
-        
-        console.log(`[SpellManager] Spell started: ${spellData.spellId}, duration: ${spellData.duration}ms at ${Date.now()}`);
         
         // Create tether animation between caster and target tile
         const tether = new Graphics();
@@ -72,20 +69,14 @@ export class SpellManager {
     }
 
     handleSpellCompleted(data) {
-        console.log(`[SpellManager] Spell completed: ${data.spellId} at ${Date.now()}`);
         // Remove the tether animation
-        console.log(`[SpellManager] active spells:`, Array.from(this.activeSpells.keys()));
         const tether = this.activeSpells.get(data.spellId);
         if (tether) {
-            const elapsed = Date.now() - tether.startTime;
-            console.log(`[SpellManager] Tether ${data.spellId} lived for ${elapsed}ms (expected: ${tether.spellData.duration}ms), started at ${tether.startTime}, completed at ${Date.now()}`);
             // Immediately stop rendering and remove from stage FIRST
             tether.forceCompleted = true;
             this.app.stage.removeChild(tether);
             tether.clear();
             this.activeSpells.delete(data.spellId);
-            console.log(`[SpellManager] active spells after:`, Array.from(this.activeSpells.keys()));
-
         }
         
         // Remove the tile transformation effect
@@ -237,8 +228,6 @@ export class SpellManager {
             }
             this.tileTransformEffects.delete(spellId);
         });
-        
-        console.log(`[SpellManager] Cleared ${spellsToRemove.length} spells and ${effectsToRemove.length} effects for caster ${casterId} at ${Date.now()}`);
     }
 
     updateSpells(time, effectsSystem) {

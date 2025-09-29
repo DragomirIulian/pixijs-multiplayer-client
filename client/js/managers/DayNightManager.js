@@ -7,7 +7,6 @@ import { ClientConfig } from '../config/clientConfig.js';
  */
 export class DayNightManager {
   constructor(app, gameMap) {
-    console.log('DayNightManager constructor called!');
     this.app = app;
     this.gameMap = gameMap; // Reference to game map for applying tints
     this.container = new Container();
@@ -35,7 +34,6 @@ export class DayNightManager {
   }
 
   async initializeUI() {
-    console.log('DayNightManager: Starting UI initialization...');
     
     try {
       // Load sun and moon textures
@@ -46,8 +44,6 @@ export class DayNightManager {
       // Initially show sun (day)
       this.updateVisualIndicators();
       
-      console.log('DayNightManager UI initialized successfully');
-      
     } catch (error) {
       console.error('Error initializing DayNightManager UI:', error);
       console.error('Full error:', error);
@@ -56,11 +52,9 @@ export class DayNightManager {
     // Add container to app stage LAST
     this.app.stage.addChild(this.container);
     this.container.visible = true;
-    console.log('Container added to stage with', this.container.children.length, 'children');
   }
 
   async loadTextures() {
-    console.log('Loading sun/moon textures...');
     
     // Create sun sprite
     const sunTexture = await Assets.load('./resources/sun.png');
@@ -69,7 +63,6 @@ export class DayNightManager {
     this.sunSprite.height = ClientConfig.DAY_NIGHT.SUN_MOON_SIZE;
     this.sunSprite.x = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_X;
     this.sunSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
-    console.log('Sun sprite created at:', this.sunSprite.x, this.sunSprite.y, 'size:', this.sunSprite.width, 'x', this.sunSprite.height);
     
     // Create moon sprite
     const moonTexture = await Assets.load('./resources/moon3.png');
@@ -79,18 +72,14 @@ export class DayNightManager {
     this.moonSprite.x = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_X;
     this.moonSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
     this.moonSprite.visible = false; // Initially hidden
-    console.log('Moon sprite created at:', this.moonSprite.x, this.moonSprite.y, 'size:', this.moonSprite.width, 'x', this.moonSprite.height);
     
     // Add sprites to container
     this.container.addChild(this.sunSprite);
     this.container.addChild(this.moonSprite);
-    
-    console.log('Both sprites added to container. Container children count:', this.container.children.length);
   }
 
   createFallbackSprites() {
     // Create simple colored rectangles as fallbacks
-    console.log('Creating fallback sprites...');
     
     // Sun fallback (yellow circle)
     const sunGraphics = new Graphics();
@@ -99,7 +88,6 @@ export class DayNightManager {
     sunGraphics.x = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_X;
     sunGraphics.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
     this.sunSprite = sunGraphics;
-    console.log('Fallback sun created at:', sunGraphics.x, sunGraphics.y);
     
     // Moon fallback (white circle)
     const moonGraphics = new Graphics();
@@ -109,12 +97,9 @@ export class DayNightManager {
     moonGraphics.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
     moonGraphics.visible = false;
     this.moonSprite = moonGraphics;
-    console.log('Fallback moon created at:', moonGraphics.x, moonGraphics.y);
     
     this.container.addChild(this.sunSprite);
     this.container.addChild(this.moonSprite);
-    
-    console.log('Fallback sprites added to container');
   }
 
   createTimeDisplay() {
@@ -158,19 +143,15 @@ export class DayNightManager {
       return;
     }
     
-    console.log('updateVisualIndicators: Current phase =', this.currentPhase);
-    
     // Update visibility based on phase
     switch (this.currentPhase) {
       case 'day':
         this.sunSprite.visible = true;
         this.moonSprite.visible = false;
-        console.log('Day phase: Sun visible, Moon hidden');
         break;
       case 'night':
         this.sunSprite.visible = false;
         this.moonSprite.visible = true;
-        console.log('Night phase: Sun hidden, Moon visible');
         break;
       case 'dawn':
         // Transition from moon to sun
@@ -178,7 +159,6 @@ export class DayNightManager {
         this.moonSprite.visible = true;
         this.sunSprite.alpha = this.currentProgress;
         this.moonSprite.alpha = 1 - this.currentProgress;
-        console.log('Dawn phase: Both visible, transitioning');
         break;
       case 'dusk':
         // Transition from sun to moon
@@ -186,7 +166,6 @@ export class DayNightManager {
         this.moonSprite.visible = true;
         this.sunSprite.alpha = 1 - this.currentProgress;
         this.moonSprite.alpha = this.currentProgress;
-        console.log('Dusk phase: Both visible, transitioning');
         break;
     }
     

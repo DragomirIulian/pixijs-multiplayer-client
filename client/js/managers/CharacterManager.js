@@ -74,13 +74,9 @@ export class CharacterManager {
     }
 
     handleCharacterDeath(data, effectsSystem) {
-        console.log(`[CharacterManager] Character death: ${data.characterId} at ${Date.now()}`);
         const character = this.characters.get(data.characterId);
         if (character && effectsSystem) {
-            console.log(`[CharacterManager] Starting death animation for ${data.characterId}`);
             effectsSystem.createDeathAnimation(character);
-        } else {
-            console.log(`[CharacterManager] No character found for death: ${data.characterId}`);
         }
     }
 

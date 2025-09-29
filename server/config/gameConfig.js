@@ -82,7 +82,8 @@ const GameConfig = {
      ATTACK_DAMAGE_MAX: 25,
     
     // Spell configuration
-    SPELL_COOLDOWN: 5000,      // 20 seconds
+    SPELL_COOLDOWN: 20000,      // 20 seconds
+    SPELL_COOLDOWN_VARIANCE: 0.25, // 25% variance in initial seeking cooldown (±25% of cooldown)
     SPELL_RANGE: 150,
     SPELL_CAST_TIME: 3000,      // 5 seconds
     SPELL_PREPARATION_TIME: 1000, // 1 second
@@ -120,7 +121,8 @@ const GameConfig = {
 
   // Spawn configuration
   SPAWN: {
-    SOULS_PER_TEAM: 20,
+    SOULS_PER_TEAM: 10,
+    MIN_SOULS_PER_TEAM: 2,
     SAFE_DISTANCE_FROM_BORDER: 3, // tiles
     EDGE_BUFFER: 3                // tiles from map edge
   },
@@ -132,6 +134,11 @@ const GameConfig = {
     WORLD_STATE_SYNC_INTERVAL: 10000  // 10 seconds
   },
 
+  // UI configuration
+  UI: {
+    SHOW_SCORING: false          // Enable/disable scoring display in UI
+  },
+
   // Territory configuration
   TERRITORY: {
     BARRIER_DISTANCE: 50,
@@ -140,7 +147,7 @@ const GameConfig = {
 
   // Mating and reproduction configuration
   MATING: {
-    MIN_RESTING_SOULS: 0,       // Minimum souls per team to avoid extinction
+    MIN_RESTING_SOULS: 5,       // Minimum souls per team to avoid extinction
     MAX_SOULS_PER_TEAM: 10,      // Maximum souls per team
     MIN_ENERGY_FOR_MATING: 0.5, // 30% energy required to mate (reduced for testing)
     MATING_RANGE: 120,          // Distance souls need to be for mating (increased)
@@ -180,7 +187,7 @@ const GameConfig = {
     DESTRUCTION_DAMAGE: 100,     // Damage dealt when nexus is destroyed
     SPAWN_OFFSET_RANGE: 25,     // Random offset range for spawning around nexus
     SIZE_TILES: 2,              // Nexus size in tiles (2x2)
-    VISUAL_MULTIPLIER: 1,     // Visual size multiplier for client rendering
+    VISUAL_MULTIPLIER: 3,     // Visual size multiplier for client rendering
     
     // Positions (in tile coordinates) - Updated for 23x14 grid
     LIGHT_NEXUS: {

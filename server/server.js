@@ -66,7 +66,10 @@ function broadcastWorldState() {
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),
     statistics: gameManager.getStatistics(),
-    borderScores: gameManager.getBorderScores()
+    borderScores: gameManager.getBorderScores(),
+    config: {
+      ui: GameConfig.UI
+    }
   });
 }
 
@@ -82,7 +85,10 @@ wss.on('connection', (ws) => {
     activeSpells: gameManager.getActiveSpells(),
     dayNightState: gameManager.getDayNightState(),
     statistics: gameManager.getStatistics(),
-    borderScores: gameManager.getBorderScores()
+    borderScores: gameManager.getBorderScores(),
+    config: {
+      ui: GameConfig.UI
+    }
   }));
   
   // Handle messages from client

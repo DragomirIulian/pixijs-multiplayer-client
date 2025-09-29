@@ -6,7 +6,7 @@ const { SoulStateMachine, SoulStates } = require('./SoulStateMachine');
  * Encapsulates all soul behavior and properties
  */
 class Soul {
-  constructor(id, type, x, y, tileMap = null, isChild = false, movementSystem = null) {
+  constructor(id, type, x, y, tileMap = null, isChild = false, movementSystem = null, spellSystem = null) {
     this.id = id;
     this.name = `${type === 'dark-soul' ? 'Dark' : 'Light'} Soul`;
     this.type = type;
@@ -51,7 +51,7 @@ class Soul {
     this.readyToCompleteMating = false;
     
     // State machine
-    this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem);
+    this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem, spellSystem);
   }
 
   update(allSouls) {
@@ -302,7 +302,6 @@ class Soul {
       const fallbackThreshold = GameConfig.SOUL.SEEKING_TIMEOUT * 0.5; // 70% of seeking timeout
       if (seekingDuration > fallbackThreshold && !this.shouldUseFallbackCasting) {
         this.shouldUseFallbackCasting = true;
-        console.log(`Soul ${this.id} stuck for ${seekingDuration}ms, enabling fallback casting`);
       }
     } else {
       // Reset when not seeking

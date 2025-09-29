@@ -17,9 +17,6 @@ export class NetworkHandler {
     }
 
     handleServerMessage(data) {
-        if (data.type === 'spell_completed') {
-            console.log(`[NetworkHandler] Processing spell_completed for ${data.spellId}`);
-        }
         switch(data.type) {
             case 'disconnected':
                 this.clearAllGameData();
@@ -37,7 +34,7 @@ export class NetworkHandler {
                 }, ClientConfig.ANIMATION.CHARACTER_REMOVE_DELAY);
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores);
+                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores, data.config);
                 break;
             case 'orb_spawned':
                 this.energyOrbManager.spawnEnergyOrb(data.orb);
@@ -55,7 +52,6 @@ export class NetworkHandler {
                 this.spellManager.handleSpellStarted(data.spell, this.gameMap);
                 break;
             case 'spell_completed':
-                console.log(`[NetworkHandler] Received spell_completed event:`, data);
                 this.spellManager.handleSpellCompleted(data);
                 break;
             case 'tile_updated':
@@ -77,7 +73,6 @@ export class NetworkHandler {
                 this.handleSoulMatured(data);
                 break;
             case 'character_death':
-                console.log(`[NetworkHandler] Received character_death event:`, data);
                 this.characterManager.handleCharacterDeath(data, this.effectsSystem);
                 // Notify statistics display for visual feedback
                 if (this.statisticsDisplay) {
@@ -99,7 +94,6 @@ export class NetworkHandler {
                 break;
             case 'nexus_destroyed':
                 // Handle nexus destruction
-                console.log(`[NetworkHandler] Nexus destroyed! ${data.nexusType} nexus destroyed by ${data.destroyedByTeam} team`);
                 // Could add special effects or UI notifications here
                 break;
             case 'nexus_update':
@@ -115,7 +109,7 @@ export class NetworkHandler {
         this.spellManager.clearAllSpells();
     }
 
-    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores) {
+    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores, config) {
         // Smart update - only change what's different to prevent visual glitches
         this.updateCharactersSmartly(charactersData);
         this.updateEnergyOrbsSmartly(energyOrbsData);
@@ -130,6 +124,11 @@ export class NetworkHandler {
         // Update border scores if provided separately
         if (borderScores && this.gameMap) {
             this.gameMap.updateBorderScores(borderScores);
+        }
+        
+        // Update UI configuration if provided
+        if (config && config.ui && this.gameMap) {
+            this.gameMap.updateUIConfig(config.ui);
         }
         
         // Update day/night state

@@ -55,6 +55,11 @@ class SpellSystem {
           this.movementSystem.updateBorderScores();
         }
         
+        // Handle territory changes for displaced souls
+        if (this.movementSystem && this.movementSystem.handleTerritoryChange) {
+          this.movementSystem.handleTerritoryChange(capturedTiles, allSouls);
+        }
+        
         // Force souls to re-evaluate their targets immediately after tile changes
         allSouls.forEach(soul => {
           if (soul.stateMachine && (soul.stateMachine.getCurrentState() === 'seeking' || soul.stateMachine.getCurrentState() === 'seeking_nexus')) {
@@ -118,7 +123,6 @@ class SpellSystem {
       const tile = this.tileMap.tiles[soul.prepareTarget.y] && this.tileMap.tiles[soul.prepareTarget.y][soul.prepareTarget.x];
       if (tile && tile.type === soul.teamType) {
         // Target tile is now friendly - cancel preparation and go back to seeking
-        console.log(`Soul ${soul.id} cancelling preparation - target tile is now friendly`);
         soul.prepareTarget = null;
         soul.stateMachine.transitionTo('seeking');
       }

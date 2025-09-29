@@ -74,8 +74,6 @@ export class NexusManager {
         const finalWidth = visualSize * TILE_WIDTH;
         const finalHeight = visualSize * TILE_WIDTH;
         
-        console.log(`Nexus ${nexusData.type}: size=${nexusData.size}, multiplier=${nexusData.visualMultiplier}, visualSize=${visualSize}, finalSize=${finalWidth}x${finalHeight}`);
-        console.log(`Original texture size: ${texture.width}x${texture.height}`);
         
         nexusSprite.width = finalWidth;
         nexusSprite.height = finalHeight;

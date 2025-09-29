@@ -41,8 +41,6 @@ export class Game {
         this.nexusManager = null;
         this.networkHandler = null;
         this.statisticsDisplay = null;
-        console.log('init..');
-
         
         this.init();
     }
@@ -91,13 +89,10 @@ export class Game {
 
     setupManagers() {
         // Initialize managers with focused responsibilities
-        console.log('Setting up managers...');
         this.characterManager = new CharacterManager(this.app, this.characterCard);
         this.energyOrbManager = new EnergyOrbManager(this.app);
         this.spellManager = new SpellManager(this.app);
-        console.log('About to create DayNightManager...');
         this.dayNightManager = new DayNightManager(this.app, this.gameMap);
-        console.log('DayNightManager created:', this.dayNightManager);
         
         // Initialize nexus manager
         this.nexusManager = new NexusManager(this.app);
@@ -166,7 +161,6 @@ window.addEventListener('load', async () => {
     document.addEventListener('keydown', (event) => {
         if (event.key.toLowerCase() === 's' && game.gameMap) {
             game.gameMap.toggleScoreDisplay();
-            console.log('Score display toggled');
         }
     });
 });

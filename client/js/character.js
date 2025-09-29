@@ -32,6 +32,12 @@ export class Character {
         // Current state for tracking
         this.currentState = characterData.currentState || 'unknown';
         
+        // Happy state tracking (for 5 seconds after mating)
+        this.happyStateEndTime = 0;
+        
+        // Combat cooldown tracking (for 5 seconds after combat)
+        this.combatCooldownEndTime = 0;
+        
         // Interpolation
         this.interpolationSpeed = ClientConfig.CHARACTER.INTERPOLATION_SPEED;
         
@@ -45,15 +51,9 @@ export class Character {
     }
 
     async init() {
-        // Load the texture based on character type and age
-        let texturePath;
-        if (this.isChild) {
-            // Use the same texture as parent type for children - will tint white
-            texturePath = `./resources/${this.type}.png`;
-        } else {
-            texturePath = `./resources/${this.type}.png`;
-        }
-        const texture = await Assets.load(texturePath);
+        // Load the kryon texture based on current state
+        const kryonImagePath = this.getKryonImagePath();
+        const texture = await Assets.load(kryonImagePath);
         
         // Create a sprite
         this.sprite = new Sprite(texture);
@@ -65,10 +65,8 @@ export class Character {
         // Set initial scale based on maturity
         this.updateScale();
         
-        // Children have white tint initially
-        if (this.isChild) {
-            this.sprite.tint = 0xFFFFFF;
-        }
+        // Store the current kryon image for tracking changes
+        this.currentKryonImage = kryonImagePath;
     }
 
     updateFromServer(characterData) {
@@ -118,8 +116,22 @@ export class Character {
             this.updateScale(); // Update scale based on new maturity
         }
         if (characterData.currentState !== undefined) {
+            const previousState = this.currentState;
             this.currentState = characterData.currentState;
+            
+            // Track when exiting combat states - start combat cooldown
+            if (this.isCombatState(previousState) && !this.isCombatState(this.currentState)) {
+                this.startCombatCooldown();
+            }
         }
+        
+        // Check if just finished mating (only trigger happy state for mating)
+        if (this.isMating && characterData.isMating === false) {
+            this.triggerHappyState();
+        }
+        
+        // Update kryon image based on new state
+        this.updateKryonImage();
         
         // Update any other properties from server
         if (characterData.rotation !== undefined) {
@@ -179,6 +191,18 @@ export class Character {
     update(time) {
         if (!this.sprite) return;
 
+        // Check if happy state has expired
+        if (this.happyStateEndTime > 0 && Date.now() > this.happyStateEndTime) {
+            this.happyStateEndTime = 0;
+            this.updateKryonImage(); // Update image when happy state ends
+        }
+        
+        // Check if combat cooldown has expired
+        if (this.combatCooldownEndTime > 0 && Date.now() > this.combatCooldownEndTime) {
+            this.combatCooldownEndTime = 0;
+            this.updateKryonImage(); // Update image when combat cooldown ends
+        }
+
         // Don't move if dying
         if (!this.isDying) {
             // Movement interpolation
@@ -196,32 +220,118 @@ export class Character {
         this.sprite.x = this.x;
         this.sprite.y = this.y + floatY;
         
-        // Visual feedback for mating, casting and preparing (but not if dying)
-        if (this.isMating && !this.isDying) {
-            // Pink tint when mating
-            this.sprite.tint = 0xFF69B4; // Hot pink for mating
-        } else if (this.isCasting && !this.isDying) {
-            // Color tint when casting
-            const castingColor = this.type === 'dark-soul' ? 
-                ClientConfig.COLORS.DARK_SOUL_CASTING : 
-                ClientConfig.COLORS.LIGHT_SOUL_CASTING;
-            this.sprite.tint = castingColor;
-        } else if (this.isPreparing && !this.isDying) {
-            // Different color when preparing to cast (lighter tint)
-            const preparingColor = this.type === 'dark-soul' ? 
-                ClientConfig.COLORS.DARK_SOUL_PREPARING : 
-                ClientConfig.COLORS.LIGHT_SOUL_PREPARING;
-            this.sprite.tint = preparingColor;
-        } else if (!this.isDying) {
-            // Normal appearance (only if not dying)
-            // Children stay white, adults get normal color
-            this.sprite.tint = this.isChild ? 0xFFFFFF : 0xFFFFFF;
+        // Apply visual tints for combat states (when using original soul images)
+        if (!this.isDying) {
+            // Combat states use original soul images with color tints
+            if (this.isMating && (this.currentState !== 'attacking' && this.currentState !== 'seeking' && 
+                                 this.currentState !== 'defending' && this.currentState !== 'preparing' && 
+                                 this.currentState !== 'casting' && this.currentState !== 'seeking_nexus' && 
+                                 this.currentState !== 'attacking_nexus')) {
+                // Pink tint when mating (only if using kryon image)
+                this.sprite.tint = 0xFF69B4; // Hot pink for mating
+            } else if (this.isCasting) {
+                // Color tint when casting (using original soul image)
+                const castingColor = this.type === 'dark-soul' ? 
+                    ClientConfig.COLORS.DARK_SOUL_CASTING : 
+                    ClientConfig.COLORS.LIGHT_SOUL_CASTING;
+                this.sprite.tint = castingColor;
+            } else if (this.isPreparing) {
+                // Different color when preparing to cast (using original soul image)
+                const preparingColor = this.type === 'dark-soul' ? 
+                    ClientConfig.COLORS.DARK_SOUL_PREPARING : 
+                    ClientConfig.COLORS.LIGHT_SOUL_PREPARING;
+                this.sprite.tint = preparingColor;
+            } else {
+                // Normal appearance - kryon images handle most visual states
+                this.sprite.tint = this.isChild ? 0xFFFFFF : 0xFFFFFF;
+            }
         }
         // If dying, don't change tint (death animation controls it)
         
         // Add slight rotation for floating effect (but not when dying)
         if (!this.isDying) {
             this.sprite.rotation = Math.sin(this.floatOffset * 2) * 0.1;
+        }
+    }
+
+    // Kryon image management methods
+    getKryonImagePath() {
+        const teamColor = this.type === 'dark-soul' ? 'black' : 'white';
+        
+        // Check for death first (highest priority)
+        if (this.isDying || this.energy <= 0) {
+            return `./resources/kryons/dead_${teamColor}_kryon.png`;
+        }
+        // Check for combat states OR combat cooldown - use existing soul images
+        else if (this.isCombatState(this.currentState) || this.isInCombatCooldown()) {
+            return `./resources/${this.type}.png`;
+        }
+        // Check for happy state (after eating/mating)
+        else if (this.happyStateEndTime > 0 && Date.now() < this.happyStateEndTime) {
+            return `./resources/kryons/happy_${teamColor}_kryon.png`;
+        }
+        // Check for mating state
+        else if (this.isMating) {
+            return `./resources/kryons/love_${teamColor}_kryon.png`;
+        }
+        // Check for specific peaceful states
+        else if (this.currentState === 'roaming' || this.currentState === 'resting' || this.currentState === 'socialising') {
+            return `./resources/kryons/happy_${teamColor}_kryon.png`;
+        }
+        else if (this.currentState === 'hungry') {
+            return `./resources/kryons/neutral_${teamColor}_kryon.png`;
+        }
+        // Check for sleep state (could be added later)
+        // else if (this.currentState === 'sleeping') {
+        //     return `./resources/kryons/sleep_${teamColor}_kryon.png`;
+        // }
+        // Default to neutral for any other unknown states
+        else {
+            return `./resources/kryons/neutral_${teamColor}_kryon.png`;
+        }
+    }
+
+    triggerHappyState() {
+        // Set happy state for 5 seconds
+        this.happyStateEndTime = Date.now() + 5000;
+        this.updateKryonImage();
+    }
+
+    isCombatState(state) {
+        return state === 'attacking' || 
+               state === 'seeking' || 
+               state === 'defending' ||
+               state === 'preparing' ||
+               state === 'casting' ||
+               state === 'seeking_nexus' ||
+               state === 'attacking_nexus';
+    }
+
+    startCombatCooldown() {
+        // Set combat cooldown for 5 seconds
+        this.combatCooldownEndTime = Date.now() + 5000;
+        this.updateKryonImage();
+    }
+
+    isInCombatCooldown() {
+        return this.combatCooldownEndTime > 0 && Date.now() < this.combatCooldownEndTime;
+    }
+
+    async updateKryonImage() {
+        if (!this.sprite) return;
+        
+        const newKryonImagePath = this.getKryonImagePath();
+        
+        // Only update if the image actually changed
+        if (newKryonImagePath !== this.currentKryonImage) {
+            try {
+                const newTexture = await Assets.load(newKryonImagePath);
+                this.sprite.texture = newTexture;
+                this.currentKryonImage = newKryonImagePath;
+            } catch (error) {
+                console.warn(`Failed to load kryon image: ${newKryonImagePath}`, error);
+                // Keep using current texture if load fails
+            }
         }
     }
 }

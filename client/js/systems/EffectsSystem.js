@@ -179,11 +179,11 @@ export class EffectsSystem {
   createDeathAnimation(character) {
     if (!character || !character.sprite) return;
     
-    // Simple death animation: turn gray and fade out
+    // Set dying state - this will trigger the dead kryon image
     character.isDying = true;
     
-    // Make soul gray and stop moving
-    character.sprite.tint = 0x808080; // Gray color
+    // Update to dead kryon image immediately
+    character.updateKryonImage();
     
     // Stop all movement immediately
     character.vx = 0;
@@ -191,15 +191,14 @@ export class EffectsSystem {
     character.targetX = character.x;
     character.targetY = character.y;
     
-    // Animate the death effect
+    // Animate the death effect - just fade out, don't change tint
     const startTime = Date.now();
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = elapsed / ClientConfig.ANIMATION.DEATH_DURATION;
       
       if (progress < 1 && character.sprite) {
-        // Keep gray tint and gradually reduce transparency
-        character.sprite.tint = 0x808080; // Force gray tint
+        // Gradually reduce transparency (let kryon image handle the visual)
         character.sprite.alpha = 1 - progress;
         
         requestAnimationFrame(animate);
@@ -207,7 +206,6 @@ export class EffectsSystem {
         // Cleanup - make completely invisible
         if (character.sprite) {
           character.sprite.alpha = 0;
-          character.sprite.tint = 0x808080;
         }
       }
     };
