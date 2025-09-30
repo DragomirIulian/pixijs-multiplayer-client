@@ -367,15 +367,16 @@ export class Character {
             this.y += (this.targetY - this.y) * this.interpolationSpeed;
         }
         
-        // Apply floating animation (but not when dying or sleeping)
-        if (!this.isDying && !this.isSleeping) {
+        // Apply floating animation (but not when dying)
+        if (!this.isDying) {
             this.floatOffset += this.floatSpeed * time.deltaTime;
         }
-        const floatY = (this.isDying || this.isSleeping) ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
+        const floatY = this.isDying ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
         
         // Calculate rotation offset for shadow positioning using the EXACT same values as the soul
-        const rotationAmount = (this.isDying || this.isSleeping) ? 0 : Math.sin(this.floatOffset * 2) * 0.2;
-        const rotationOffset = (this.isDying || this.isSleeping) ? 0 : -Math.sin(this.floatOffset * 2) * 5; // Scale up the rotation movement for visible shadow offset
+        const baseRotation = Math.sin(this.floatOffset * 2);
+        const rotationAmount = this.isDying ? 0 : baseRotation * (this.isSleeping ? 0.05 : 0.2);
+        const rotationOffset = this.isDying ? 0 : -baseRotation * (this.isSleeping ? 2 : 5); // Gentler movement when sleeping
         
         // Update sprite position
         this.sprite.x = this.x;
@@ -415,8 +416,8 @@ export class Character {
         }
         // If dying, don't change tint (death animation controls it)
         
-        // Add slight rotation for floating effect (but not when dying or sleeping)
-        if (!this.isDying && !this.isSleeping) {
+        // Add slight rotation for floating effect (but not when dying)
+        if (!this.isDying) {
             this.sprite.rotation = rotationAmount;
         }
     }

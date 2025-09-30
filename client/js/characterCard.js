@@ -7,9 +7,10 @@ export class CharacterCard {
         this.infoCard = null;
         this.selectedCharacter = null;
         this.nameText = null;
-        this.idText = null;
         this.energyText = null;
         this.energyBar = null;
+        this.teamBorder = null;
+        this.headerText = null;
         this.createCard();
     }
 
@@ -22,40 +23,49 @@ export class CharacterCard {
         );
         this.infoCard.visible = false;
 
-        // Create 8-bit style background (larger)
+        // Create background matching stats panel style
         const cardBackground = new Graphics();
-        cardBackground.beginFill(ClientConfig.COLORS.UI_BACKGROUND);
-        cardBackground.lineStyle(ClientConfig.UI.CARD_BORDER_WIDTH, ClientConfig.COLORS.UI_BORDER);
+        // Semi-transparent dark background like stats panel
+        cardBackground.beginFill(0x000000, 0.2);  // rgba(0, 0, 0, 0.2)
+        cardBackground.lineStyle(2, 0x444444, 0.8);  // rgba(68, 68, 68, 0.8)
         cardBackground.drawRect(0, 0, ClientConfig.UI.CHARACTER_CARD_WIDTH, ClientConfig.UI.CHARACTER_CARD_HEIGHT);
         cardBackground.endFill();
         this.infoCard.addChild(cardBackground);
 
-        // Create pixelated text style (larger)
+        // Add header text like stats panel
+        this.headerText = new Text('CHARACTER INFO', new TextStyle({
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 14,
+            fill: 0xFFD700,  // Gold color like stats panel header
+            fontWeight: 'bold',
+            align: 'center'
+        }));
+        this.headerText.anchor.set(0.5, 0);
+        this.headerText.position.set(ClientConfig.UI.CHARACTER_CARD_WIDTH / 2, 8);
+        this.infoCard.addChild(this.headerText);
+
+        // Create text style matching stats panel
         const textStyle = new TextStyle({
-            fontFamily: 'monospace',
-            fontSize: ClientConfig.UI.TEXT_FONT_SIZE,
-            fill: ClientConfig.COLORS.UI_TEXT,
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 12,
+            fill: 0xFFFFFF,
             align: 'left'
         });
 
         // Character name text
         this.nameText = new Text('', textStyle);
-        this.nameText.position.set(ClientConfig.UI.CARD_PADDING, ClientConfig.UI.CARD_PADDING);
+        this.nameText.position.set(ClientConfig.UI.CARD_PADDING, 35);
         this.infoCard.addChild(this.nameText);
 
-        // Character ID text
-        this.idText = new Text('', textStyle);
-        this.idText.position.set(ClientConfig.UI.CARD_PADDING, ClientConfig.UI.CARD_PADDING + ClientConfig.UI.TEXT_LINE_HEIGHT);
-        this.infoCard.addChild(this.idText);
 
         // Energy text
         this.energyText = new Text('', textStyle);
-        this.energyText.position.set(ClientConfig.UI.CARD_PADDING, ClientConfig.UI.CARD_PADDING + ClientConfig.UI.TEXT_LINE_HEIGHT * 2);
+        this.energyText.position.set(ClientConfig.UI.CARD_PADDING, 52);
         this.infoCard.addChild(this.energyText);
 
         // State text
         this.stateText = new Text('', textStyle);
-        this.stateText.position.set(ClientConfig.UI.CARD_PADDING, ClientConfig.UI.CARD_PADDING + ClientConfig.UI.TEXT_LINE_HEIGHT * 3);
+        this.stateText.position.set(ClientConfig.UI.CARD_PADDING, 69);
         this.infoCard.addChild(this.stateText);
 
         // Energy bar background (larger)
@@ -69,30 +79,18 @@ export class CharacterCard {
         this.energyBar = new Graphics();
         this.infoCard.addChild(this.energyBar);
 
-        // Energy percentage text
-        this.energyPercentText = new Text('', new TextStyle({
-            fontFamily: 'monospace',
-            fontSize: ClientConfig.UI.PERCENT_FONT_SIZE,
-            fill: 0xFFFFFF,
-            stroke: 0x000000,
-            strokeThickness: ClientConfig.UI.TEXT_STROKE_THICKNESS,
-            align: 'center'
-        }));
-        this.energyPercentText.anchor.set(0.5);
-        this.energyPercentText.position.set(ClientConfig.UI.ENERGY_PERCENT_X, ClientConfig.UI.ENERGY_PERCENT_Y);
-        this.infoCard.addChild(this.energyPercentText);
 
-        // Close button (larger)
+        // Close button with stats panel style
         const closeButton = new Graphics();
-        closeButton.beginFill(ClientConfig.COLORS.UI_CLOSE_BUTTON);
-        closeButton.lineStyle(ClientConfig.UI.CLOSE_BUTTON_BORDER, ClientConfig.COLORS.UI_BORDER);
+        closeButton.beginFill(0x2c3e50);  // Stats panel button color
+        closeButton.lineStyle(2, 0x333333);
         closeButton.drawRect(ClientConfig.UI.CLOSE_BUTTON_X, ClientConfig.UI.CLOSE_BUTTON_Y, ClientConfig.UI.CLOSE_BUTTON_SIZE, ClientConfig.UI.CLOSE_BUTTON_SIZE);
         closeButton.endFill();
         
-        const closeText = new Text('X', new TextStyle({
-            fontFamily: 'monospace',
-            fontSize: ClientConfig.UI.CLOSE_FONT_SIZE,
-            fill: ClientConfig.COLORS.UI_TEXT,
+        const closeText = new Text('×', new TextStyle({
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 16,
+            fill: 0xFFFFFF,
             align: 'center'
         }));
         closeText.anchor.set(0.5);
@@ -113,9 +111,11 @@ export class CharacterCard {
     show(character) {
         this.selectedCharacter = character;
         this.nameText.text = `Name: ${character.name}`;
-        this.idText.text = `ID: ${character.id}`;
         this.energyText.text = `Energy: ${Math.floor(character.getEnergy())}/${Math.floor(character.maxEnergy)}`;
-        this.stateText.text = `State: ${character.currentState || 'unknown'}`;
+        this.stateText.text = `Status: ${this.formatState(character.currentState || 'unknown', character)}`;
+        
+        // Add team-specific border styling like stats panel
+        this.updateTeamStyling(character);
         
         // Update energy bar
         this.updateEnergyBar();
@@ -140,15 +140,8 @@ export class CharacterCard {
         // Update energy text and bar
         this.energyText.text = `Energy: ${Math.floor(this.selectedCharacter.getEnergy())}/${Math.floor(this.selectedCharacter.maxEnergy)}`;
         
-        // Show state with additional mating info
-        let stateText = `State: ${this.selectedCharacter.currentState || 'unknown'}`;
-        if (this.selectedCharacter.isMating) {
-            stateText += ' 💕';
-        }
-        if (this.selectedCharacter.isChild) {
-            stateText += ' 👶';
-        }
-        this.stateText.text = stateText;
+        // Update state with user-friendly formatting
+        this.stateText.text = `Status: ${this.formatState(this.selectedCharacter.currentState || 'unknown', this.selectedCharacter)}`;
         this.updateEnergyBar();
     }
 
@@ -170,8 +163,51 @@ export class CharacterCard {
         this.energyBar.drawRect(ClientConfig.UI.CARD_PADDING, ClientConfig.UI.ENERGY_BAR_Y, barWidth, ClientConfig.UI.ENERGY_BAR_HEIGHT);
         this.energyBar.endFill();
         
-        // Update percentage text
-        this.energyPercentText.text = `${Math.round(energyPercentage * 100)}%`;
+    }
+
+
+    updateTeamStyling(character) {
+        // Add team-specific left border like stats panel
+        if (this.teamBorder) {
+            this.infoCard.removeChild(this.teamBorder);
+        }
+        
+        this.teamBorder = new Graphics();
+        const borderColor = character.type === 'light-soul' ? 0xFFD700 : 0x8A2BE2;  // Gold for light, purple for dark
+        this.teamBorder.beginFill(borderColor);
+        this.teamBorder.drawRect(0, 0, 4, ClientConfig.UI.CHARACTER_CARD_HEIGHT);
+        this.teamBorder.endFill();
+        this.infoCard.addChild(this.teamBorder);
+    }
+
+    formatState(state, character) {
+        // Create user-friendly state names with icons
+        const stateMap = {
+            'roaming': '🚶 Wandering',
+            'hungry': '🍽️ Hungry',
+            'seeking': '🎯 Seeking Target',
+            'preparing': '⚡ Preparing Spell',
+            'casting': '✨ Casting Spell',
+            'defending': '⚔️ Moving to Combat',
+            'attacking': '⚔️ In Combat',
+            'seeking_nexus': '🏰 Seeking Enemy Nexus',
+            'attacking_nexus': '🏰 Attacking Nexus',
+            'socialising': '👥 Socializing',
+            'resting': '😌 Resting',
+            'mating': '💕 Mating',
+            'seeking_sleep': '😴 Seeking Rest',
+            'sleeping': '😴 Sleeping',
+            'unknown': '❓ Unknown'
+        };
+
+        let displayText = stateMap[state] || `❓ ${state}`;
+        
+        // Add additional status indicators
+        if (character.isChild) {
+            displayText += ' 👶';
+        }
+        
+        return displayText;
     }
 
     isVisible() {
