@@ -20,7 +20,7 @@ export const ClientConfig = {
 
   // Character configuration
   CHARACTER: {
-    SCALE: 0.08,
+    SCALE: 0.06,
     INTERPOLATION_SPEED: 0.1,
     FLOATING_AMPLITUDE: 5,
     FLOATING_SPEED: 0.02,
@@ -31,7 +31,16 @@ export const ClientConfig = {
     SHADOW_ALPHA: 0.3,          // Shadow transparency
     SHADOW_OFFSET_X: 2,         // Horizontal shadow offset
     SHADOW_OFFSET_Y: 30,        // Vertical shadow offset (below character)
-    SHADOW_COLOR: 0x000000      // Black shadow
+    SHADOW_COLOR: 0x000000,     // Black shadow
+    
+    // Casting progress bar configuration
+    CASTING_BAR_WIDTH: 60,      // Progress bar width
+    CASTING_BAR_HEIGHT: 8,      // Progress bar height
+    CASTING_BAR_OFFSET_Y: -45,  // Offset above character
+    CASTING_BAR_BACKGROUND_COLOR: 0x333333,  // Dark gray background
+    CASTING_BAR_BORDER_COLOR: 0x000000,     // Black border
+    CASTING_BAR_PROGRESS_COLOR: 0x00FF00,   // Green progress (will be overridden by team color)
+    CASTING_BAR_BORDER_WIDTH: 1            // Border thickness
   },
 
   // UI configuration

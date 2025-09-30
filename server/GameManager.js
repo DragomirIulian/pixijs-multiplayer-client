@@ -8,6 +8,7 @@ const SpellSystem = require('./systems/SpellSystem');
 const MatingSystem = require('./systems/MatingSystem');
 const DayNightSystem = require('./systems/DayNightSystem');
 const StatisticsManager = require('./systems/StatisticsManager');
+const BuffManager = require('./systems/BuffManager');
 
 /**
  * Main Game Manager
@@ -26,6 +27,7 @@ class GameManager {
     this.matingSystem = null; // Will be initialized after all other systems
     this.dayNightSystem = null; // Day/night cycle system
     this.statisticsManager = null; // Statistics tracking system
+    this.buffManager = null; // Centralized buff management system
     
     // Game state
     this.gameEvents = [];
@@ -91,10 +93,11 @@ class GameManager {
   }
 
   initializeSystems() {
-    this.dayNightSystem = new DayNightSystem();
+    this.buffManager = new BuffManager();
+    this.dayNightSystem = new DayNightSystem(this.buffManager);
     this.scoringSystem = new ScoringSystem(this.tileMap);
     this.movementSystem = new MovementSystem(this.tileMap, this.scoringSystem);
-    this.spellSystem = new SpellSystem(this.tileMap, this.dayNightSystem, this.movementSystem, this.scoringSystem);
+    this.spellSystem = new SpellSystem(this.tileMap, this.buffManager, this.movementSystem, this.scoringSystem);
     this.combatSystem = new CombatSystem(this.spellSystem, this);
     this.matingSystem = new MatingSystem(this);
     this.statisticsManager = new StatisticsManager();
@@ -251,7 +254,11 @@ class GameManager {
   update() {
     this.gameEvents = [];
 
-    // Update day/night cycle FIRST (affects other systems)
+    // Update buff manager FIRST (manages all buff state)
+    const buffEvents = this.buffManager.update();
+    this.gameEvents.push(...buffEvents);
+
+    // Update day/night cycle SECOND (may apply buffs)
     const dayNightEvents = this.dayNightSystem.update();
     this.gameEvents.push(...dayNightEvents);
 
@@ -273,9 +280,9 @@ class GameManager {
     const aliveSoulIds = Array.from(this.souls.keys());
     this.movementSystem.cleanupPositionHistory(aliveSoulIds);
 
-    // Update movement system (with team-specific day/night speed modifier)
+    // Update movement system (with team-specific buff modifiers)
     this.souls.forEach(soul => {
-      const movementMultiplier = this.dayNightSystem.getMovementMultiplier(soul.type);
+      const movementMultiplier = this.buffManager.getMovementMultiplier(soul.type);
       this.movementSystem.updateSoul(soul, this.souls, this.energyOrbs, movementMultiplier);
     });
 
@@ -598,6 +605,10 @@ class GameManager {
 
   getStatistics() {
     return this.statisticsManager.getClientStats();
+  }
+
+  getBuffs() {
+    return this.buffManager.getAllBuffs();
   }
 }
 

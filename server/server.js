@@ -67,6 +67,7 @@ function broadcastWorldState() {
     dayNightState: gameManager.getDayNightState(),
     statistics: gameManager.getStatistics(),
     borderScores: gameManager.getBorderScores(),
+    buffs: gameManager.getBuffs(),
     config: {
       ui: GameConfig.UI
     }
@@ -86,6 +87,7 @@ wss.on('connection', (ws) => {
     dayNightState: gameManager.getDayNightState(),
     statistics: gameManager.getStatistics(),
     borderScores: gameManager.getBorderScores(),
+    buffs: gameManager.getBuffs(),
     config: {
       ui: GameConfig.UI
     }

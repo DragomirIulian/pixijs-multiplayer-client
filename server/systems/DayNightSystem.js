@@ -5,11 +5,18 @@ const GameConfig = require('../config/gameConfig');
  * Manages the game's day/night cycle and related effects
  */
 class DayNightSystem {
-  constructor() {
+  constructor(buffManager = null) {
+    this.buffManager = buffManager;
     this.cycleStartTime = Date.now();
     this.currentPhase = 'day'; // 'day', 'night', 'dawn', 'dusk'
     this.currentProgress = 0; // 0-1 representing progress through current phase
     this.ambientLight = GameConfig.DAY_NIGHT.DAY_AMBIENT_LIGHT;
+    this.lastAppliedPhase = null; // Track which phase buffs were last applied for
+    
+    // Apply initial buffs for the starting phase
+    if (this.buffManager) {
+      this.updateDayNightBuffs();
+    }
   }
 
   /**
@@ -35,8 +42,10 @@ class DayNightSystem {
     // Update ambient light based on phase
     this.updateAmbientLight();
     
-    // If phase changed, broadcast the change
+    // If phase changed, broadcast the change and update buffs
     if (previousPhase !== this.currentPhase) {
+      this.updateDayNightBuffs();
+      
       events.push({
         type: 'day_night_phase_change',
         phase: this.currentPhase,
@@ -117,9 +126,77 @@ class DayNightSystem {
   }
 
   /**
+   * Update team buffs based on current day/night phase
+   */
+  updateDayNightBuffs() {
+    if (!this.buffManager || this.lastAppliedPhase === this.currentPhase) {
+      return; // No buff manager or phase hasn't changed
+    }
+
+    // Clear existing day/night buffs
+    this.buffManager.clearBuffsBySource('daynight');
+
+    // Apply new buffs based on current phase
+    if (this.currentPhase === 'day') {
+      // Light team gets day buffs
+      this.buffManager.applyBuff('daynight', 'light-soul', {
+        type: 'day_blessing',
+        name: 'Day Blessing',
+        description: `+${Math.round((GameConfig.DAY_NIGHT.LIGHT_TEAM_DAY_SPEED_MULTIPLIER - 1) * 100)}% Speed, +${Math.round((1 - GameConfig.DAY_NIGHT.LIGHT_TEAM_DAY_CAST_TIME_MULTIPLIER) * 100)}% Cast Speed`,
+        icon: 'sun',
+        effects: {
+          speedMultiplier: GameConfig.DAY_NIGHT.LIGHT_TEAM_DAY_SPEED_MULTIPLIER,
+          castTimeMultiplier: GameConfig.DAY_NIGHT.LIGHT_TEAM_DAY_CAST_TIME_MULTIPLIER
+        },
+        priority: 10
+      });
+
+      // Light team gets day energy bonus
+      this.buffManager.applyBuff('daynight', 'light-soul', {
+        type: 'day_energy',
+        name: 'Day Energy',
+        description: `+${Math.round((GameConfig.DAY_NIGHT.ENERGY_MULTIPLIER - 1) * 100)}% Energy Collection`,
+        icon: 'energy',
+        effects: {
+          energyMultiplier: GameConfig.DAY_NIGHT.ENERGY_MULTIPLIER
+        },
+        priority: 5
+      });
+    } else if (this.currentPhase === 'night') {
+      // Dark team gets night buffs
+      this.buffManager.applyBuff('daynight', 'dark-soul', {
+        type: 'night_blessing',
+        name: 'Night Blessing',
+        description: `+${Math.round((GameConfig.DAY_NIGHT.DARK_TEAM_NIGHT_SPEED_MULTIPLIER - 1) * 100)}% Speed, +${Math.round((1 - GameConfig.DAY_NIGHT.DARK_TEAM_NIGHT_CAST_TIME_MULTIPLIER) * 100)}% Cast Speed`,
+        icon: 'moon',
+        effects: {
+          speedMultiplier: GameConfig.DAY_NIGHT.DARK_TEAM_NIGHT_SPEED_MULTIPLIER,
+          castTimeMultiplier: GameConfig.DAY_NIGHT.DARK_TEAM_NIGHT_CAST_TIME_MULTIPLIER
+        },
+        priority: 10
+      });
+
+      // Dark team gets night energy bonus
+      this.buffManager.applyBuff('daynight', 'dark-soul', {
+        type: 'night_energy',
+        name: 'Night Energy',
+        description: `+${Math.round((GameConfig.DAY_NIGHT.ENERGY_MULTIPLIER - 1) * 100)}% Energy Collection`,
+        icon: 'energy',
+        effects: {
+          energyMultiplier: GameConfig.DAY_NIGHT.ENERGY_MULTIPLIER
+        },
+        priority: 5
+      });
+    }
+
+    this.lastAppliedPhase = this.currentPhase;
+  }
+
+  /**
    * Get the current movement speed multiplier for a specific team
    * @param {string} teamType - 'light-soul' or 'dark-soul'
    * @returns {number} Movement speed multiplier
+   * @deprecated Use BuffManager.getMovementMultiplier() instead
    */
   getMovementMultiplier(teamType) {
     if (this.currentPhase === 'day' && teamType === 'light-soul') {
@@ -137,7 +214,7 @@ class DayNightSystem {
    */
   getEnergyMultiplier() {
     if (this.currentPhase === 'night') {
-      return GameConfig.DAY_NIGHT.NIGHT_ENERGY_MULTIPLIER;
+      return GameConfig.DAY_NIGHT.ENERGY_MULTIPLIER;
     }
     return 1.0; // Normal energy during day
   }
@@ -191,6 +268,7 @@ class DayNightSystem {
   isNight() {
     return this.currentPhase === 'night' || this.currentPhase === 'dusk';
   }
+
 }
 
 module.exports = DayNightSystem;

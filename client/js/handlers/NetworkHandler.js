@@ -5,7 +5,7 @@ import { ClientConfig } from '../config/clientConfig.js';
  * Handles all server message processing and delegation
  */
 export class NetworkHandler {
-    constructor(characterManager, energyOrbManager, spellManager, gameMap, effectsSystem, dayNightManager, nexusManager, statisticsDisplay) {
+    constructor(characterManager, energyOrbManager, spellManager, gameMap, effectsSystem, dayNightManager, nexusManager, statisticsDisplay, buffDisplay) {
         this.characterManager = characterManager;
         this.energyOrbManager = energyOrbManager;
         this.spellManager = spellManager;
@@ -14,6 +14,7 @@ export class NetworkHandler {
         this.dayNightManager = dayNightManager;
         this.nexusManager = nexusManager;
         this.statisticsDisplay = statisticsDisplay;
+        this.buffDisplay = buffDisplay;
     }
 
     handleServerMessage(data) {
@@ -34,7 +35,17 @@ export class NetworkHandler {
                 }, ClientConfig.ANIMATION.CHARACTER_REMOVE_DELAY);
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores, data.config);
+                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores, data.buffs, data.config);
+                break;
+            case 'buff_applied':
+                if (this.buffDisplay) {
+                    this.buffDisplay.handleBuffApplied(data);
+                }
+                break;
+            case 'buff_removed':
+                if (this.buffDisplay) {
+                    this.buffDisplay.handleBuffRemoved(data);
+                }
                 break;
             case 'orb_spawned':
                 this.energyOrbManager.spawnEnergyOrb(data.orb);
@@ -50,15 +61,22 @@ export class NetworkHandler {
                 break;
             case 'spell_started':
                 this.spellManager.handleSpellStarted(data.spell, this.gameMap);
+                // Start the casting progress bar
+                this.handleSpellStarted(data.spell.casterId);
+                break;
+            case 'spell_progress':
+                this.handleSpellProgress(data);
                 break;
             case 'spell_completed':
                 this.spellManager.handleSpellCompleted(data);
+                this.handleSpellEnded(data.casterId);
                 break;
             case 'tile_updated':
                 this.handleTileUpdated(data);
                 break;
             case 'spell_interrupted':
                 this.spellManager.handleSpellInterrupted(data);
+                this.handleSpellEnded(data.casterId);
                 break;
             case 'mating_started':
                 this.handleMatingStarted(data);
@@ -109,7 +127,7 @@ export class NetworkHandler {
         this.spellManager.clearAllSpells();
     }
 
-    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores, config) {
+    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores, buffs, config) {
         // Smart update - only change what's different to prevent visual glitches
         this.updateCharactersSmartly(charactersData);
         this.updateEnergyOrbsSmartly(energyOrbsData);
@@ -134,6 +152,11 @@ export class NetworkHandler {
         // Update day/night state
         if (dayNightState && this.dayNightManager) {
             this.dayNightManager.updateState(dayNightState);
+        }
+        
+        // Update buffs
+        if (buffs && this.buffDisplay) {
+            this.buffDisplay.updateBuffs(buffs);
         }
         
         // Update statistics
@@ -268,6 +291,34 @@ export class NetworkHandler {
             if (this.effectsSystem) {
                 this.effectsSystem.createChildSpawnEffect(character.x, character.y);
             }
+        }
+    }
+
+    handleSpellProgress(data) {
+        // Update casting progress bar for the caster
+        const character = this.characterManager.getCharacter(data.casterId);
+        if (character) {
+            // Ensure progress bar is visible and update progress
+            if (!character.isCastingProgress) {
+                character.startCastingProgressBar();
+            }
+            character.updateCastingProgressBar(data.progress);
+        }
+    }
+
+    handleSpellStarted(casterId) {
+        // Start the casting progress bar for the caster
+        const character = this.characterManager.getCharacter(casterId);
+        if (character) {
+            character.startCastingProgressBar();
+        }
+    }
+
+    handleSpellEnded(casterId) {
+        // Hide casting progress bar for the caster
+        const character = this.characterManager.getCharacter(casterId);
+        if (character) {
+            character.stopCastingProgressBar();
         }
     }
 }

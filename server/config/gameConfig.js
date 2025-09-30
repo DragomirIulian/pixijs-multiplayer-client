@@ -159,9 +159,9 @@ const GameConfig = {
   // Day/Night cycle configuration
   DAY_NIGHT: {
     CYCLE_DURATION: 120000,     // 2 minutes for full day/night cycle (120000ms)
-    DAY_DURATION: 0.6,          // 60% of cycle is day
+    DAY_DURATION: 0.4,          // 40% of cycle is day
     NIGHT_DURATION: 0.4,        // 40% of cycle is night
-    TRANSITION_DURATION: 0.1,   // 10% for dawn/dusk transitions
+    TRANSITION_DURATION: 0.1,   // 10% for dawn/dusk transitions (total 20%)
     
     // Team-specific bonuses
     LIGHT_TEAM_DAY_SPEED_MULTIPLIER: 2,     // Light team gets 50% speed boost during day
@@ -171,7 +171,7 @@ const GameConfig = {
     DARK_TEAM_NIGHT_CAST_TIME_MULTIPLIER: 0.5, // Dark team gets 30% faster spell CASTING TIME during night
     
     // General effects
-    NIGHT_ENERGY_MULTIPLIER: 1,  // Energy orbs give 50% more at night
+    ENERGY_MULTIPLIER: 1.5,  // Energy orbs give 50% more at night
     
     // Visual settings
     DAY_AMBIENT_LIGHT: 1.0,     // Full brightness during day
@@ -186,7 +186,7 @@ const GameConfig = {
     DESTRUCTION_DAMAGE: 100,     // Damage dealt when nexus is destroyed
     SPAWN_OFFSET_RANGE: 25,     // Random offset range for spawning around nexus
     SIZE_TILES: 2,              // Nexus size in tiles (2x2)
-    VISUAL_MULTIPLIER: 3,     // Visual size multiplier for client rendering
+    VISUAL_MULTIPLIER: 2,     // Visual size multiplier for client rendering
     
     // Positions (in tile coordinates) - Updated for 23x14 grid
     LIGHT_NEXUS: {

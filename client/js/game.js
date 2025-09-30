@@ -11,6 +11,7 @@ import { DayNightManager } from './managers/DayNightManager.js';
 import { NexusManager } from './managers/NexusManager.js';
 import { NetworkHandler } from './handlers/NetworkHandler.js';
 import StatisticsDisplay from './managers/StatisticsDisplay.js';
+import { BuffDisplay } from './managers/BuffDisplay.js';
 
 /**
  * Game - Main orchestrator class following Single Responsibility Principle
@@ -41,6 +42,7 @@ export class Game {
         this.nexusManager = null;
         this.networkHandler = null;
         this.statisticsDisplay = null;
+        this.buffDisplay = null;
         
         this.init();
     }
@@ -91,6 +93,9 @@ export class Game {
         // Initialize day/night manager first
         this.dayNightManager = new DayNightManager(this.app, this.gameMap);
         
+        // Initialize buff display manager
+        this.buffDisplay = new BuffDisplay(this.app);
+        
         // Initialize managers with focused responsibilities
         this.characterManager = new CharacterManager(this.app, this.characterCard, this.dayNightManager);
         this.energyOrbManager = new EnergyOrbManager(this.app);
@@ -123,7 +128,8 @@ export class Game {
             this.effectsSystem,
             this.dayNightManager,
             this.nexusManager,
-            this.statisticsDisplay
+            this.statisticsDisplay,
+            this.buffDisplay
         );
     }
 

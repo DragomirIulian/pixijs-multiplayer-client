@@ -31,6 +31,11 @@ export class CharacterManager {
         
         this.characters.set(characterData.id, character);
         this.app.stage.addChild(character.sprite);
+        
+        // Add casting progress bar to stage
+        if (character.castingContainer) {
+            this.app.stage.addChild(character.castingContainer);
+        }
     }
 
     updateCharacter(characterData) {
@@ -61,6 +66,11 @@ export class CharacterManager {
                 this.app.stage.removeChild(character.shadowSprite);
             }
             
+            // Remove casting progress bar
+            if (character.castingContainer) {
+                this.app.stage.removeChild(character.castingContainer);
+            }
+            
             // Clean up character resources
             character.destroy();
             this.characters.delete(characterId);
@@ -74,6 +84,9 @@ export class CharacterManager {
             }
             if (character.shadowSprite) {
                 this.app.stage.removeChild(character.shadowSprite);
+            }
+            if (character.castingContainer) {
+                this.app.stage.removeChild(character.castingContainer);
             }
             character.destroy();
         });

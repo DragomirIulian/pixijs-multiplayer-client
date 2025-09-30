@@ -1,4 +1,4 @@
-import { Assets, Sprite } from 'https://unpkg.com/pixi.js@8.13.0/dist/pixi.min.mjs';
+import { Assets, Sprite, Graphics, Container } from 'https://unpkg.com/pixi.js@8.13.0/dist/pixi.min.mjs';
 import { ClientConfig } from './config/clientConfig.js';
 
 export class Character {
@@ -50,6 +50,14 @@ export class Character {
         
         this.sprite = null;
         this.shadowSprite = null;
+        
+        // Casting progress bar components
+        this.castingContainer = null;
+        this.castingProgressBar = null;
+        this.castingBackground = null;
+        this.castingBorder = null;
+        this.isCastingProgress = false;
+        this.castingProgress = 0;
     }
 
     async init() {
@@ -80,6 +88,9 @@ export class Character {
         
         // Store the current kryon image for tracking changes
         this.currentKryonImage = kryonImagePath;
+        
+        // Initialize casting progress bar
+        this.initializeCastingProgressBar();
     }
 
     updateFromServer(characterData) {
@@ -167,6 +178,96 @@ export class Character {
 
     addEnergy(amount) {
         this.setEnergy(this.energy + amount);
+    }
+
+    initializeCastingProgressBar() {
+        // Create container for casting progress bar
+        this.castingContainer = new Container();
+        this.castingContainer.visible = false;
+        this.castingContainer.zIndex = 15; // Render above character
+        
+        const config = ClientConfig.CHARACTER;
+        
+        // Create background bar
+        this.castingBackground = new Graphics();
+        this.castingBackground.rect(
+            -config.CASTING_BAR_WIDTH / 2, 
+            config.CASTING_BAR_OFFSET_Y,
+            config.CASTING_BAR_WIDTH,
+            config.CASTING_BAR_HEIGHT
+        );
+        this.castingBackground.fill(config.CASTING_BAR_BACKGROUND_COLOR);
+        
+        // Create progress bar
+        this.castingProgressBar = new Graphics();
+        
+        // Create border
+        this.castingBorder = new Graphics();
+        this.castingBorder.rect(
+            -config.CASTING_BAR_WIDTH / 2,
+            config.CASTING_BAR_OFFSET_Y,
+            config.CASTING_BAR_WIDTH,
+            config.CASTING_BAR_HEIGHT
+        );
+        this.castingBorder.stroke({
+            width: config.CASTING_BAR_BORDER_WIDTH,
+            color: config.CASTING_BAR_BORDER_COLOR
+        });
+        
+        // Add components to container
+        this.castingContainer.addChild(this.castingBackground);
+        this.castingContainer.addChild(this.castingProgressBar);
+        this.castingContainer.addChild(this.castingBorder);
+    }
+
+    startCastingProgressBar() {
+        if (this.castingContainer) {
+            this.isCastingProgress = true;
+            this.castingContainer.visible = true;
+            this.updateCastingProgressBar(0);
+        }
+    }
+
+    updateCastingProgressBar(progress) {
+        if (!this.castingContainer || !this.isCastingProgress) return;
+        
+        this.castingProgress = Math.max(0, Math.min(1, progress));
+        
+        const config = ClientConfig.CHARACTER;
+        const progressWidth = config.CASTING_BAR_WIDTH * this.castingProgress;
+        
+        // Determine progress color based on team type
+        const progressColor = this.type === 'dark-soul' ? 0x9C27B0 : 0xFFD700; // Purple for dark, yellow for light
+        
+        // Update progress bar
+        this.castingProgressBar.clear();
+        if (progressWidth > 0) {
+            this.castingProgressBar.rect(
+                -config.CASTING_BAR_WIDTH / 2,
+                config.CASTING_BAR_OFFSET_Y,
+                progressWidth,
+                config.CASTING_BAR_HEIGHT
+            );
+            this.castingProgressBar.fill(progressColor);
+        }
+        
+        // Update position to follow character
+        this.updateCastingProgressBarPosition();
+    }
+
+    updateCastingProgressBarPosition() {
+        if (this.castingContainer) {
+            this.castingContainer.x = this.sprite.x;
+            this.castingContainer.y = this.sprite.y;
+        }
+    }
+
+    stopCastingProgressBar() {
+        if (this.castingContainer) {
+            this.isCastingProgress = false;
+            this.castingContainer.visible = false;
+            this.castingProgress = 0;
+        }
     }
 
     removeEnergy(amount) {
@@ -395,6 +496,9 @@ export class Character {
                 // Keep using current texture if load fails
             }
         }
+        
+        // Update casting progress bar position
+        this.updateCastingProgressBarPosition();
     }
 
     // Cleanup method for when character is removed
@@ -406,6 +510,13 @@ export class Character {
         if (this.shadowSprite) {
             this.shadowSprite.destroy();
             this.shadowSprite = null;
+        }
+        if (this.castingContainer) {
+            this.castingContainer.destroy();
+            this.castingContainer = null;
+            this.castingProgressBar = null;
+            this.castingBackground = null;
+            this.castingBorder = null;
         }
     }
 }

@@ -6,9 +6,9 @@ const { SoulStates } = require('../entities/SoulStateMachine');
  * Handles spell casting, preparation, and effects
  */
 class SpellSystem {
-  constructor(tileMap, dayNightSystem = null, movementSystem = null, scoringSystem = null) {
+  constructor(tileMap, buffManager = null, movementSystem = null, scoringSystem = null) {
     this.tileMap = tileMap;
-    this.dayNightSystem = dayNightSystem;
+    this.buffManager = buffManager;
     this.movementSystem = movementSystem;
     this.scoringSystem = scoringSystem;
     this.activeSpells = new Map();
@@ -23,9 +23,29 @@ class SpellSystem {
       this.processSoulSpellCasting(soul, allSouls);
     });
 
+    // Update casting progress for active spells
+    this.updateCastingProgress();
+
     // Note: Spell completion is now handled separately to allow interruption
 
     return this.spellEvents;
+  }
+
+  updateCastingProgress() {
+    // Update progress for all active spells
+    this.activeSpells.forEach((spell, spellId) => {
+      const elapsed = Date.now() - spell.startTime;
+      const progress = Math.min(1.0, elapsed / (spell.completionTime - spell.startTime));
+      
+      // Send progress update event
+      this.spellEvents.push({
+        type: 'spell_progress',
+        spellId: spell.spellId,
+        casterId: spell.casterId,
+        progress: progress,
+        timeRemaining: Math.max(0, spell.completionTime - Date.now())
+      });
+    });
   }
 
   // Separate method for completing spells (called after combat)
@@ -166,8 +186,8 @@ class SpellSystem {
     }
     
     // Get team-specific cast time multiplier
-    const castTimeMultiplier = this.dayNightSystem ? 
-      this.dayNightSystem.getSpellCastTimeMultiplier(soul.type) : 1.0;
+    const castTimeMultiplier = this.buffManager ? 
+      this.buffManager.getSpellCastTimeMultiplier(soul.type) : 1.0;
     const adjustedCastTime = GameConfig.SOUL.SPELL_CAST_TIME * castTimeMultiplier;
     
     const spell = {
@@ -209,6 +229,15 @@ class SpellSystem {
         targetTileY: targetTile.y,
         duration: adjustedCastTime
       }
+    });
+
+    // Send initial progress event to ensure progress bar starts
+    this.spellEvents.push({
+      type: 'spell_progress',
+      spellId: spell.spellId,
+      casterId: spell.casterId,
+      progress: 0,
+      timeRemaining: adjustedCastTime
     });
 
   }
