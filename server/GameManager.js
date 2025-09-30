@@ -111,14 +111,14 @@ class GameManager {
       const darkNexus = this.nexuses.get('dark');
       const darkPos = darkNexus.getSpawnPosition();
       const darkSoulId = `dark-soul${i + 1}`;
-        const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
+        const darkSoul = new Soul(darkSoulId, 'dark-soul', darkPos.x, darkPos.y, this.tileMap, false, this.movementSystem, this.spellSystem, this.dayNightSystem);
       this.souls.set(darkSoulId, darkSoul);
 
       // Light souls spawn at light nexus
       const lightNexus = this.nexuses.get('light');
       const lightPos = lightNexus.getSpawnPosition();
       const lightSoulId = `light-soul${i + 1}`;
-        const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap, false, this.movementSystem, this.spellSystem);
+        const lightSoul = new Soul(lightSoulId, 'light-soul', lightPos.x, lightPos.y, this.tileMap, false, this.movementSystem, this.spellSystem, this.dayNightSystem);
       this.souls.set(lightSoulId, lightSoul);
     }
   }

@@ -254,6 +254,14 @@ class DayNightSystem {
   }
 
   /**
+   * Get the current phase
+   * @returns {string} Current phase ('day', 'night', 'dawn', 'dusk')
+   */
+  getCurrentPhase() {
+    return this.currentPhase;
+  }
+
+  /**
    * Check if it's currently day time
    * @returns {boolean} True if it's day
    */

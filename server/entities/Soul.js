@@ -6,7 +6,7 @@ const { SoulStateMachine, SoulStates } = require('./SoulStateMachine');
  * Encapsulates all soul behavior and properties
  */
 class Soul {
-  constructor(id, type, x, y, tileMap = null, isChild = false, movementSystem = null, spellSystem = null) {
+  constructor(id, type, x, y, tileMap = null, isChild = false, movementSystem = null, spellSystem = null, dayNightSystem = null) {
     this.id = id;
     this.name = `${type === 'dark-soul' ? 'Dark' : 'Light'} Soul`;
     this.type = type;
@@ -50,14 +50,22 @@ class Soul {
     this.lastMatingTime = 0;
     this.readyToCompleteMating = false;
     
+    // Sleep system
+    this.isSleeping = false;
+    this.sleepStartTime = null;
+    this.lastSleepTime = 0;
+    this.sleepCyclesUsedToday = 0;
+    this.lastSleepResetTime = Date.now();
+    
     // State machine
-    this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem, spellSystem);
+    this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem, spellSystem, dayNightSystem);
   }
 
   update(allSouls) {
     this.stateMachine.update(allSouls);
     this.updateEnergy();
     this.updateRetreat();
+    this.updateSleepCycle(this.stateMachine.dayNightSystem);
     this.checkDeath();
   }
 
@@ -68,8 +76,8 @@ class Soul {
   }
 
   updateEnergy() {
-    // Energy draining - souls slowly lose energy over time
-    if (Math.random() < GameConfig.SOUL.ENERGY_DRAIN_CHANCE) {
+    // Energy draining - souls slowly lose energy over time (but not while sleeping)
+    if (!this.isSleeping && Math.random() < GameConfig.SOUL.ENERGY_DRAIN_CHANCE) {
       this.energy = Math.max(0, this.energy - GameConfig.SOUL.ENERGY_DRAIN_AMOUNT);
     }
   }
@@ -283,6 +291,120 @@ class Soul {
     this.readyToCompleteMating = false;
   }
 
+  // Sleep methods
+  canSleep(dayNightSystem) {
+    if (!dayNightSystem) return false;
+    
+    // Check if it's the opposite cycle for this soul type
+    const isOppositeCycle = this.isOppositeCycle(dayNightSystem);
+    if (!isOppositeCycle) return false;
+    
+    // Check minimum energy requirement
+    if (this.getEnergyPercentage() < GameConfig.SLEEP.MIN_ENERGY_TO_SLEEP) return false;
+    if (this.getEnergyPercentage() > GameConfig.SLEEP.MAX_ENERGY_TO_SLEEP) return false;
+    
+    // Check if already sleeping
+    if (this.isSleeping) return false;
+    
+    // Check if sleep cooldown has passed
+    const timeSinceLastSleep = Date.now() - this.lastSleepTime;
+    if (timeSinceLastSleep < GameConfig.SLEEP.COOLDOWN) return false;
+    
+    // Check if already used sleep cycle for this day/night period
+    return this.sleepCyclesUsedToday === 0;
+  }
+
+  isOppositeCycle(dayNightSystem) {
+    const currentPhase = dayNightSystem.getCurrentPhase();
+    
+    // Light souls sleep during night, dark souls sleep during day
+    if (this.type === 'light-soul') {
+      return currentPhase === 'night';
+    } else if (this.type === 'dark-soul') {
+      return currentPhase === 'day';
+    }
+    
+    return false;
+  }
+
+  startSleep() {
+    if (this.isSleeping) return false;
+    
+    this.isSleeping = true;
+    this.sleepStartTime = Date.now();
+    this.sleepCyclesUsedToday = 1;
+    
+    return true;
+  }
+
+  completeSleep() {
+    if (!this.isSleeping) return false;
+    
+    // Recover energy (same as energy orb)
+    this.addEnergy(GameConfig.SLEEP.ENERGY_RECOVERY);
+    
+    this.isSleeping = false;
+    this.lastSleepTime = Date.now();
+    this.sleepStartTime = null;
+    
+    return true;
+  }
+
+  wakeUp() {
+    if (!this.isSleeping) return false;
+    
+    // Wake up without energy recovery (interrupted sleep)
+    this.isSleeping = false;
+    this.sleepStartTime = null;
+    
+    return true;
+  }
+
+  updateSleepCycle(dayNightSystem) {
+    if (!dayNightSystem) return;
+    
+    // Reset sleep cycles when phase changes to the soul's beneficial cycle
+    const currentPhase = dayNightSystem.getCurrentPhase();
+    const isBeneficialCycle = this.isBeneficialCycle(dayNightSystem);
+    
+    // Reset sleep count when entering beneficial cycle
+    if (isBeneficialCycle && this.sleepCyclesUsedToday > 0) {
+      const timeSinceLastReset = Date.now() - this.lastSleepResetTime;
+      const halfCycleDuration = GameConfig.DAY_NIGHT.CYCLE_DURATION * 0.5;
+      
+      if (timeSinceLastReset >= halfCycleDuration) {
+        this.sleepCyclesUsedToday = 0;
+        this.lastSleepResetTime = Date.now();
+      }
+    }
+  }
+
+  isBeneficialCycle(dayNightSystem) {
+    const currentPhase = dayNightSystem.getCurrentPhase();
+    
+    // Light souls benefit during day, dark souls benefit during night
+    if (this.type === 'light-soul') {
+      return currentPhase === 'day';
+    } else if (this.type === 'dark-soul') {
+      return currentPhase === 'night';
+    }
+    
+    return false;
+  }
+
+  getSleepProgress() {
+    if (!this.isSleeping || !this.sleepStartTime) return 0;
+    
+    const timeSlept = Date.now() - this.sleepStartTime;
+    return Math.min(1, timeSlept / GameConfig.SLEEP.SLEEP_DURATION);
+  }
+
+  isSleepComplete() {
+    if (!this.isSleeping || !this.sleepStartTime) return false;
+    
+    return Date.now() - this.sleepStartTime >= GameConfig.SLEEP.SLEEP_DURATION;
+  }
+
   /**
    * Update fallback casting system - track how long soul has been seeking
    */
@@ -327,7 +449,9 @@ class Soul {
       currentState: this.getCurrentState(),
       isChild: this.isChild,
       isMating: this.isMating,
-      maturityPercentage: this.getMaturityPercentage()
+      maturityPercentage: this.getMaturityPercentage(),
+      isSleeping: this.isSleeping,
+      sleepProgress: this.getSleepProgress()
     };
   }
 }

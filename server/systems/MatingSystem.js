@@ -159,7 +159,7 @@ class MatingSystem {
     const childId = `${parent1.type}-child-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Child inherits team type from parents
-    const childSoul = new Soul(childId, parent1.type, childX, childY, this.gameManager.tileMap, true, this.gameManager.movementSystem, this.gameManager.spellSystem);
+    const childSoul = new Soul(childId, parent1.type, childX, childY, this.gameManager.tileMap, true, this.gameManager.movementSystem, this.gameManager.spellSystem, this.gameManager.dayNightSystem);
     
     // Set initial child properties
     childSoul.energy = GameConfig.SOUL.STARTING_ENERGY_MIN; // Children start with minimum energy

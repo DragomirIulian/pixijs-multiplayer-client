@@ -30,6 +30,10 @@ export class Character {
         this.isChild = characterData.isChild || false;
         this.maturityPercentage = characterData.maturityPercentage || 1.0;
         
+        // Sleep state
+        this.isSleeping = characterData.isSleeping || false;
+        this.sleepProgress = characterData.sleepProgress || 0;
+        
         // Current state for tracking
         this.currentState = characterData.currentState || 'unknown';
         
@@ -138,6 +142,12 @@ export class Character {
         if (characterData.maturityPercentage !== undefined) {
             this.maturityPercentage = characterData.maturityPercentage;
             this.updateScale(); // Update scale based on new maturity
+        }
+        if (characterData.isSleeping !== undefined) {
+            this.isSleeping = characterData.isSleeping;
+        }
+        if (characterData.sleepProgress !== undefined) {
+            this.sleepProgress = characterData.sleepProgress;
         }
         if (characterData.currentState !== undefined) {
             const previousState = this.currentState;
@@ -350,22 +360,22 @@ export class Character {
             this.updateKryonImage(); // Update image when combat cooldown ends
         }
 
-        // Don't move if dying
-        if (!this.isDying) {
+        // Don't move if dying or sleeping
+        if (!this.isDying && !this.isSleeping) {
             // Movement interpolation
             this.x += (this.targetX - this.x) * this.interpolationSpeed;
             this.y += (this.targetY - this.y) * this.interpolationSpeed;
         }
         
-        // Apply floating animation (but not when dying)
-        if (!this.isDying) {
+        // Apply floating animation (but not when dying or sleeping)
+        if (!this.isDying && !this.isSleeping) {
             this.floatOffset += this.floatSpeed * time.deltaTime;
         }
-        const floatY = this.isDying ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
+        const floatY = (this.isDying || this.isSleeping) ? 0 : Math.sin(this.floatOffset) * this.floatAmplitude;
         
         // Calculate rotation offset for shadow positioning using the EXACT same values as the soul
-        const rotationAmount = this.isDying ? 0 : Math.sin(this.floatOffset * 2) * 0.2;
-        const rotationOffset = this.isDying ? 0 : -Math.sin(this.floatOffset * 2) * 5; // Scale up the rotation movement for visible shadow offset
+        const rotationAmount = (this.isDying || this.isSleeping) ? 0 : Math.sin(this.floatOffset * 2) * 0.2;
+        const rotationOffset = (this.isDying || this.isSleeping) ? 0 : -Math.sin(this.floatOffset * 2) * 5; // Scale up the rotation movement for visible shadow offset
         
         // Update sprite position
         this.sprite.x = this.x;
@@ -405,8 +415,8 @@ export class Character {
         }
         // If dying, don't change tint (death animation controls it)
         
-        // Add slight rotation for floating effect (but not when dying)
-        if (!this.isDying) {
+        // Add slight rotation for floating effect (but not when dying or sleeping)
+        if (!this.isDying && !this.isSleeping) {
             this.sprite.rotation = rotationAmount;
         }
     }
@@ -438,10 +448,10 @@ export class Character {
         else if (this.currentState === 'hungry') {
             return `./resources/kryons/neutral_${teamColor}_kryon.png`;
         }
-        // Check for sleep state (could be added later)
-        // else if (this.currentState === 'sleeping') {
-        //     return `./resources/kryons/sleep_${teamColor}_kryon.png`;
-        // }
+        // Check for sleep state
+        else if (this.currentState === 'sleeping' || this.isSleeping) {
+            return `./resources/kryons/sleep_${teamColor}_kryon.png`;
+        }
         // Default to neutral for any other unknown states
         else {
             return `./resources/kryons/neutral_${teamColor}_kryon.png`;

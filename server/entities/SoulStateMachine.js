@@ -17,22 +17,24 @@ const SoulStates = {
   ATTACKING_NEXUS: 'attacking_nexus', // Close to nexus and attacking it
   SOCIALISING: 'socialising',
   RESTING: 'resting',
-  MATING: 'mating'
+  MATING: 'mating',
+  SLEEPING: 'sleeping'  // Sleeping during opposite cycle for energy recovery
 };
 
 class SoulStateMachine {
-  constructor(soul, tileMap = null, movementSystem = null, spellSystem = null) {
+  constructor(soul, tileMap = null, movementSystem = null, spellSystem = null, dayNightSystem = null) {
     this.soul = soul;
     this.tileMap = tileMap;
     this.movementSystem = movementSystem;
     this.spellSystem = spellSystem;
+    this.dayNightSystem = dayNightSystem;
     this.currentState = SoulStates.ROAMING;
     this.stateStartTime = Date.now();
     // Add variance to initial seeking cooldown to prevent all souls from seeking simultaneously
-    // Generate random variance between -25% and +25% of spell cooldown
+    // Generate random variance for THIS specific soul
     const varianceRange = GameConfig.SOUL.SPELL_COOLDOWN * GameConfig.SOUL.SPELL_COOLDOWN_VARIANCE;
     const seekingVariance = (Math.random() - 0.5) * 2 * varianceRange; // Range: -varianceRange to +varianceRange
-    this.lastCastTime = Date.now() - seekingVariance;
+    this.lastCastTime = Date.now() - seekingVariance; // Each soul gets unique variance (subtract so some can cast sooner)
     this.defendingTarget = null;
     this.previousState = null;
   }
@@ -47,6 +49,10 @@ class SoulStateMachine {
 
   getTimeSinceLastCast() {
     return Date.now() - this.lastCastTime;
+  }
+
+  setDayNightSystem(dayNightSystem) {
+    this.dayNightSystem = dayNightSystem;
   }
 
   update(allSouls = new Map()) {
@@ -117,17 +123,27 @@ class SoulStateMachine {
       case SoulStates.MATING:
         this.handleMatingState(energyPercentage, allSouls);
         break;
+        
+      case SoulStates.SLEEPING:
+        this.handleSleepingState(energyPercentage, allSouls);
+        break;
     }
   }
 
   handleRoamingState(energyPercentage, allSouls) {
-    if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
-      this.transitionTo(SoulStates.HUNGRY);
+    if (this.soul.isChild) {
+        return;
+    }
+
+    // Check if can sleep during opposite cycle (HIGH priority during opposite cycle)
+    if (this.soul.canSleep(this.dayNightSystem)) {
+      this.transitionTo(SoulStates.SLEEPING);
       return;
     }
 
-    if (this.soul.isChild) {
-        return;
+    if (energyPercentage < GameConfig.SOUL.HUNGRY_THRESHOLD) {
+      this.transitionTo(SoulStates.HUNGRY);
+      return;
     }
 
     // Check team population and decide behavior
@@ -184,6 +200,12 @@ class SoulStateMachine {
   }
 
   handleHungryState(energyPercentage, allSouls) {
+    // Check if can sleep during opposite cycle (HIGH priority even when hungry)
+    if (this.soul.canSleep(this.dayNightSystem)) {
+      this.transitionTo(SoulStates.SLEEPING);
+      return;
+    }
+
     // Children cannot defend - only eat and roam
     if (!this.soul.isChild) {
       // Check if should defend (overrides all) - only for adults
@@ -362,6 +384,34 @@ class SoulStateMachine {
     this.soul.isMating = true;
   }
 
+  handleSleepingState(energyPercentage, allSouls) {
+    // Check if should wake up to defend (only valid transition from sleeping)
+    if (this.shouldBeDefender(allSouls)) {
+      // Wake up and transition to defending
+      this.soul.wakeUp();
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
+
+    // Check if sleep is complete
+    if (this.soul.isSleepComplete()) {
+      // Complete sleep with energy recovery
+      this.soul.completeSleep();
+      this.transitionTo(SoulStates.ROAMING);
+      return;
+    }
+
+    // Check if cycle ended (no longer opposite cycle)
+    if (!this.soul.isOppositeCycle(this.dayNightSystem)) {
+      // Wake up without energy recovery (cycle ended)
+      this.soul.wakeUp();
+      this.transitionTo(SoulStates.ROAMING);
+      return;
+    }
+
+    // Continue sleeping (no other transitions allowed)
+  }
+
   isCloseEnoughToAttackEnemy() {
     if (!this.soul.castingEnemyId) return false;
     
@@ -490,6 +540,16 @@ class SoulStateMachine {
       case SoulStates.MATING:
         this.soul.isMating = true;
         this.soul.isResting = false;
+        break;
+        
+      case SoulStates.SLEEPING:
+        // Start sleeping when transitioning to this state
+        if (this.previousState !== SoulStates.SLEEPING) {
+          this.soul.startSleep();
+        }
+        this.soul.isResting = true;
+        this.soul.isMating = false;
+        this.soul.isDefending = false;
         break;
         
       default:

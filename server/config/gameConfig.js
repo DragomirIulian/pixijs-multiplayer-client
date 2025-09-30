@@ -77,13 +77,13 @@ const GameConfig = {
     
      // Attack configuration
      ATTACK_RANGE: 250,           // Increased from 60
-     ATTACK_COOLDOWN: 2000,      // 2 seconds
+     ATTACK_COOLDOWN: 1000,      // 2 seconds
      ATTACK_DAMAGE_MIN: 15,
      ATTACK_DAMAGE_MAX: 25,
     
     // Spell configuration
     SPELL_COOLDOWN: 20000,      // 20 seconds
-    SPELL_COOLDOWN_VARIANCE: 0.25, // 25% variance in initial seeking cooldown (±25% of cooldown)
+    SPELL_COOLDOWN_VARIANCE: 0.5, // 25% variance in initial seeking cooldown (±25% of cooldown)
     SPELL_RANGE: 150,
     SPELL_CAST_TIME: 3000,      // 5 seconds
     SPELL_PREPARATION_TIME: 1000, // 1 second
@@ -154,6 +154,15 @@ const GameConfig = {
     MATING_TIME: 10000,         // 10 seconds to complete mating
     CHILD_MATURITY_TIME: 30000, // 30 seconds for child to become adult
     HEARTS_DISPLAY_TIME: 12000  // 12 seconds to show hearts
+  },
+
+  // Sleep configuration
+  SLEEP: {
+    SLEEP_DURATION: 20000,      // 20 seconds for full sleep cycle
+    ENERGY_RECOVERY: 50,        // Same as energy orb value (configurable)
+    COOLDOWN: 60000,            // 1 minute cooldown between sleep cycles
+    MIN_ENERGY_TO_SLEEP: 0,     // 0% energy minimum to initiate sleep
+    MAX_ENERGY_TO_SLEEP: 0.5    // 70% energy maximum to initiate sleep (low priority)
   },
 
   // Day/Night cycle configuration
