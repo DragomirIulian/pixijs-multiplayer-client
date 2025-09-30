@@ -215,6 +215,21 @@ const GameConfig = {
     
     // Border scoring system - tiles-based configuration
     BORDER_WIDTH_TILES: 3     // Border width in tiles (will be multiplied by tile size)
+  },
+
+  // Disaster Event System
+  DISASTER_EVENTS: {
+    // Global settings
+    CHECK_INTERVAL: 5000,           // Check for disaster every 5 seconds (cycle interval)
+    
+    // Freezing Snow Event
+    FREEZING_SNOW: {
+      ENABLED: true,
+      TRIGGER_CHANCE: 1,          // 10% chance per check cycle
+      DURATION: 10000,              // 1 minute (60 seconds)
+      DEATH_PERCENTAGE: 0.3,       // 15% of characters die
+      COOLDOWN: 10000              // 2 minutes cooldown before next event can occur
+    }
   }
 };
 

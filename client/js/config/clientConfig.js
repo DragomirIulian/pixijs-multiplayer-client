@@ -213,5 +213,22 @@ export const ClientConfig = {
     DUSK_BACKGROUND_TINT: 0xFF8844,   // Deeper orange for dusk
     
     TRANSITION_SPEED: 0.1,     // How fast visual transitions occur
+  },
+
+  // Disaster Events configuration
+  DISASTER_EFFECTS: {
+    // Freezing Snow Effect
+    FREEZING_SNOW: {
+      SNOW_PARTICLE_COUNT: 150,           // Number of snowflakes
+      SNOWFLAKE_SIZE_MIN: 2,              // Minimum snowflake size
+      SNOWFLAKE_SIZE_MAX: 5,              // Maximum snowflake size
+      SNOWFLAKE_SPEED_MIN: 1,             // Minimum fall speed
+      SNOWFLAKE_SPEED_MAX: 3,             // Maximum fall speed
+      SNOWFLAKE_SWAY_AMOUNT: 0.5,         // Horizontal sway amount
+      SNOWFLAKE_ALPHA: 0.8,               // Snowflake transparency
+      BLUE_TINT: 0xAADDFF,                // Blue tint color
+      BLUE_TINT_INTENSITY: 0.3,           // How much blue tint to apply (0-1)
+      VIGNETTE_ALPHA: 0.2                 // Darkness around edges
+    }
   }
 };

@@ -68,6 +68,7 @@ function broadcastWorldState() {
     statistics: gameManager.getStatistics(),
     borderScores: gameManager.getBorderScores(),
     buffs: gameManager.getBuffs(),
+    activeDisaster: gameManager.getActiveDisaster(),
     config: {
       ui: GameConfig.UI
     }
@@ -88,6 +89,7 @@ wss.on('connection', (ws) => {
     statistics: gameManager.getStatistics(),
     borderScores: gameManager.getBorderScores(),
     buffs: gameManager.getBuffs(),
+    activeDisaster: gameManager.getActiveDisaster(),
     config: {
       ui: GameConfig.UI
     }

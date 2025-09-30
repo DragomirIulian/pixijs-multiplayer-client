@@ -9,6 +9,7 @@ const MatingSystem = require('./systems/MatingSystem');
 const DayNightSystem = require('./systems/DayNightSystem');
 const StatisticsManager = require('./systems/StatisticsManager');
 const BuffManager = require('./systems/BuffManager');
+const DisasterEventSystem = require('./systems/DisasterEventSystem');
 
 /**
  * Main Game Manager
@@ -28,6 +29,7 @@ class GameManager {
     this.dayNightSystem = null; // Day/night cycle system
     this.statisticsManager = null; // Statistics tracking system
     this.buffManager = null; // Centralized buff management system
+    this.disasterEventSystem = null; // Disaster event system
     
     // Game state
     this.gameEvents = [];
@@ -102,6 +104,7 @@ class GameManager {
     this.matingSystem = new MatingSystem(this);
     this.statisticsManager = new StatisticsManager();
     this.statisticsManager.initialize(this);
+    this.disasterEventSystem = new DisasterEventSystem();
   }
 
   spawnInitialSouls() {
@@ -262,6 +265,10 @@ class GameManager {
     const dayNightEvents = this.dayNightSystem.update();
     this.gameEvents.push(...dayNightEvents);
 
+    // Update disaster event system (checks for new disasters and manages active ones)
+    const disasterEvents = this.disasterEventSystem.update();
+    this.gameEvents.push(...disasterEvents);
+
     // Update nexuses (health regeneration, etc.)
     this.nexuses.forEach(nexus => {
       nexus.update();
@@ -272,6 +279,10 @@ class GameManager {
       soul.update(this.souls);
      // soul.updateFallbackCasting(); // Track seeking time for fallback casting
     });
+
+    // Apply disaster effects (may mark souls as dead)
+    const disasterEffectEvents = this.disasterEventSystem.applyDisasterEffects(this.souls);
+    this.gameEvents.push(...disasterEffectEvents);
 
     // Remove dead souls
     this.handleSoulDeaths();
@@ -609,6 +620,10 @@ class GameManager {
 
   getBuffs() {
     return this.buffManager.getAllBuffs();
+  }
+
+  getActiveDisaster() {
+    return this.disasterEventSystem.getActiveDisaster();
   }
 }
 

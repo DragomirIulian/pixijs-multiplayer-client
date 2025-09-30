@@ -12,6 +12,7 @@ import { NexusManager } from './managers/NexusManager.js';
 import { NetworkHandler } from './handlers/NetworkHandler.js';
 import StatisticsDisplay from './managers/StatisticsDisplay.js';
 import { BuffDisplay } from './managers/BuffDisplay.js';
+import { DisasterEffectsManager } from './managers/DisasterEffectsManager.js';
 
 /**
  * Game - Main orchestrator class following Single Responsibility Principle
@@ -43,6 +44,7 @@ export class Game {
         this.networkHandler = null;
         this.statisticsDisplay = null;
         this.buffDisplay = null;
+        this.disasterEffectsManager = null;
         
         this.init();
     }
@@ -108,6 +110,9 @@ export class Game {
         // Initialize statistics display
         this.statisticsDisplay = new StatisticsDisplay();
         
+        // Initialize disaster effects manager
+        this.disasterEffectsManager = new DisasterEffectsManager(this.app);
+        
         // Make statisticsDisplay available globally for HTML button
         window.statsDisplay = this.statisticsDisplay;
         
@@ -129,7 +134,8 @@ export class Game {
             this.dayNightManager,
             this.nexusManager,
             this.statisticsDisplay,
-            this.buffDisplay
+            this.buffDisplay,
+            this.disasterEffectsManager
         );
     }
 
@@ -153,6 +159,7 @@ export class Game {
         this.spellManager.updateSpells(time, this.effectsSystem);
         this.dayNightManager.update(time);
         this.nexusManager.update(time);
+        this.disasterEffectsManager.update(time);
         
         // Update UI components
         if (this.characterCard) {

@@ -367,7 +367,7 @@ export class Character {
             this.y += (this.targetY - this.y) * this.interpolationSpeed;
         }
         
-        // Apply floating animation (but not when dying)
+        // Apply floating animation (but not when dying or sleeping)
         if (!this.isDying) {
             this.floatOffset += this.floatSpeed * time.deltaTime;
         }
