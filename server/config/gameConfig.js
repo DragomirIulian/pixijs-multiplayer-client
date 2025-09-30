@@ -175,8 +175,7 @@ const GameConfig = {
     
     // Visual settings
     DAY_AMBIENT_LIGHT: 1.0,     // Full brightness during day
-    NIGHT_AMBIENT_LIGHT: 0.3,   // 30% brightness during night
-    TRANSITION_SPEED: 0.05      // How fast lighting transitions
+    NIGHT_AMBIENT_LIGHT: 0.3    // 30% brightness during night
   },
 
   // Nexus configuration

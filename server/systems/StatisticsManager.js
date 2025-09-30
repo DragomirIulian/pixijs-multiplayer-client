@@ -16,7 +16,15 @@ class StatisticsManager {
         births: 0,
         deaths: 0,
         tilesControlled: 0,
-        totalTilesConquered: 0
+        totalTilesConquered: 0,
+        // Feeling indices data
+        successfulCasts: 0,
+        totalEnergySum: 0,
+        highEnergyCount: 0,
+        recentLosses: 0,
+        moraleIndex: 50,
+        hungerIndex: 50,
+        aggressionIndex: 50
       },
       dark: {
         totalSouls: 0,
@@ -26,7 +34,15 @@ class StatisticsManager {
         births: 0,
         deaths: 0,
         tilesControlled: 0,
-        totalTilesConquered: 0
+        totalTilesConquered: 0,
+        // Feeling indices data
+        successfulCasts: 0,
+        totalEnergySum: 0,
+        highEnergyCount: 0,
+        recentLosses: 0,
+        moraleIndex: 50,
+        hungerIndex: 50,
+        aggressionIndex: 50
       }
     };
 
@@ -101,6 +117,7 @@ class StatisticsManager {
     this.updateSoulCounts(gameManager.souls);
     this.updateTeamPercentages();
     this.updateTileControl(gameManager);
+    this.decayRecentLosses(); // Gradually reduce recent losses over time
     this.gameStats.lastUpdateTime = Date.now();
     
     // Add current state to history
@@ -115,14 +132,24 @@ class StatisticsManager {
     this.teamStats.light.totalSouls = 0;
     this.teamStats.light.adultSouls = 0;
     this.teamStats.light.childSouls = 0;
+    this.teamStats.light.totalEnergySum = 0;
+    this.teamStats.light.highEnergyCount = 0;
     this.teamStats.dark.totalSouls = 0;
     this.teamStats.dark.adultSouls = 0;
     this.teamStats.dark.childSouls = 0;
+    this.teamStats.dark.totalEnergySum = 0;
+    this.teamStats.dark.highEnergyCount = 0;
 
-    // Count souls by team
+    // Count souls by team and track energy
     souls.forEach(soul => {
       const team = soul.type === 'light-soul' ? 'light' : 'dark';
       this.teamStats[team].totalSouls++;
+      this.teamStats[team].totalEnergySum += soul.energy;
+      
+      // Count high energy souls (above 70% energy)
+      if (soul.energy >= soul.maxEnergy * 0.7) {
+        this.teamStats[team].highEnergyCount++;
+      }
       
       if (soul.isAdult()) {
         this.teamStats[team].adultSouls++;
@@ -132,6 +159,9 @@ class StatisticsManager {
     });
 
     this.gameStats.totalSouls = this.teamStats.light.totalSouls + this.teamStats.dark.totalSouls;
+    
+    // Update feeling indices after soul counts are updated
+    this.updateFeelingIndices();
   }
 
   /**
@@ -149,6 +179,93 @@ class StatisticsManager {
       this.teamStats.dark.percentage = 50;
     }
     
+  }
+
+  /**
+   * Update feeling indices for both teams
+   */
+  updateFeelingIndices() {
+    ['light', 'dark'].forEach(team => {
+      const stats = this.teamStats[team];
+      
+      // Calculate Morale Index (0-100)
+      // Based on: successful casts, mating (births), high energy count
+      // Decreases with: starvation (low energy), territory loss, no newborns
+      let moraleBase = 50;
+      
+      // Positive morale factors
+      if (stats.successfulCasts > 0) {
+        moraleBase += Math.min(stats.successfulCasts * 2, 20); // Max +20 from casts
+      }
+      if (stats.births > 0) {
+        moraleBase += Math.min(stats.births * 3, 15); // Max +15 from births
+      }
+      if (stats.totalSouls > 0) {
+        const highEnergyRatio = stats.highEnergyCount / stats.totalSouls;
+        moraleBase += highEnergyRatio * 15; // Max +15 from high energy
+      }
+      
+      // Negative morale factors
+      if (stats.totalSouls > 0) {
+        const avgEnergy = stats.totalEnergySum / stats.totalSouls;
+        if (avgEnergy < 30) { // Team is starving
+          moraleBase -= 20;
+        }
+      }
+      if (stats.recentLosses > 0) {
+        moraleBase -= Math.min(stats.recentLosses * 5, 25); // Max -25 from losses
+      }
+      
+      stats.moraleIndex = Math.max(0, Math.min(100, Math.round(moraleBase)));
+      
+      // Calculate Hunger Index (0-100, where 0 = starving, 100 = well fed)
+      if (stats.totalSouls > 0) {
+        const avgEnergy = stats.totalEnergySum / stats.totalSouls;
+        stats.hungerIndex = Math.round((avgEnergy / 100) * 100); // Convert to 0-100 scale
+      } else {
+        stats.hungerIndex = 50; // Default when no souls
+      }
+      
+      // Calculate Aggression Index (0-100)
+      // Based on: lots of units & high morale
+      // Drops when: they take losses
+      let aggressionBase = 30;
+      
+      // Unit count factor
+      if (stats.totalSouls > 5) {
+        aggressionBase += Math.min((stats.totalSouls - 5) * 3, 30); // Max +30 from unit count
+      }
+      
+      // Morale factor
+      if (stats.moraleIndex > 60) {
+        aggressionBase += (stats.moraleIndex - 60) * 0.5; // Up to +20 from high morale
+      }
+      
+      // Territory control factor
+      if (stats.percentage > 50) {
+        aggressionBase += (stats.percentage - 50) * 0.3; // Up to +15 from territory advantage
+      }
+      
+      // Loss penalty
+      if (stats.recentLosses > 0) {
+        aggressionBase -= Math.min(stats.recentLosses * 8, 40); // Max -40 from losses
+      }
+      
+      stats.aggressionIndex = Math.max(0, Math.min(100, Math.round(aggressionBase)));
+    });
+  }
+
+  /**
+   * Gradually decay recent losses over time to prevent permanent negative effects
+   */
+  decayRecentLosses() {
+    // Decay recent losses by 10% every update (roughly every 5 seconds)
+    this.teamStats.light.recentLosses = Math.max(0, this.teamStats.light.recentLosses * 0.9);
+    this.teamStats.dark.recentLosses = Math.max(0, this.teamStats.dark.recentLosses * 0.9);
+    
+    // Round down to avoid floating point accumulation
+    if (this.teamStats.light.recentLosses < 0.1) this.teamStats.light.recentLosses = 0;
+    if (this.teamStats.dark.recentLosses < 0.1) this.teamStats.dark.recentLosses = 0;
   }
 
   /**
@@ -250,6 +367,9 @@ class StatisticsManager {
         case 'tile_conquered':
           this.handleTileConquest(event);
           break;
+        case 'spell_completed':
+          this.handleSpellCompleted(event);
+          break;
       }
     });
   }
@@ -272,7 +392,18 @@ class StatisticsManager {
     if (event.characterData) {
       const team = event.characterData.type === 'light-soul' ? 'light' : 'dark';
       this.teamStats[team].deaths++;
+      this.teamStats[team].recentLosses++; // Track for aggression calculation
       this.gameStats.totalDeaths++;
+    }
+  }
+
+  /**
+   * Handle successful spell completion events
+   */
+  handleSpellCompleted(event) {
+    if (event.casterType) {
+      const team = event.casterType === 'light-soul' ? 'light' : 'dark';
+      this.teamStats[team].successfulCasts++;
     }
   }
 
@@ -349,7 +480,11 @@ class StatisticsManager {
           births: this.teamStats.light.births,
           deaths: this.teamStats.light.deaths,
           tilesControlled: this.teamStats.light.tilesControlled,
-          totalTilesConquered: this.teamStats.light.totalTilesConquered
+          totalTilesConquered: this.teamStats.light.totalTilesConquered,
+          // Feeling indices
+          moraleIndex: this.teamStats.light.moraleIndex,
+          hungerIndex: this.teamStats.light.hungerIndex,
+          aggressionIndex: this.teamStats.light.aggressionIndex
         },
         dark: {
           name: 'Dark Souls',
@@ -361,7 +496,11 @@ class StatisticsManager {
           births: this.teamStats.dark.births,
           deaths: this.teamStats.dark.deaths,
           tilesControlled: this.teamStats.dark.tilesControlled,
-          totalTilesConquered: this.teamStats.dark.totalTilesConquered
+          totalTilesConquered: this.teamStats.dark.totalTilesConquered,
+          // Feeling indices
+          moraleIndex: this.teamStats.dark.moraleIndex,
+          hungerIndex: this.teamStats.dark.hungerIndex,
+          aggressionIndex: this.teamStats.dark.aggressionIndex
         }
       },
       game: {
@@ -398,11 +537,15 @@ class StatisticsManager {
   reset() {
     this.teamStats.light = {
       totalSouls: 0, adultSouls: 0, childSouls: 0, percentage: 0,
-      births: 0, deaths: 0, tilesControlled: 0, totalTilesConquered: 0
+      births: 0, deaths: 0, tilesControlled: 0, totalTilesConquered: 0,
+      successfulCasts: 0, totalEnergySum: 0, highEnergyCount: 0, recentLosses: 0,
+      moraleIndex: 50, hungerIndex: 50, aggressionIndex: 50
     };
     this.teamStats.dark = {
       totalSouls: 0, adultSouls: 0, childSouls: 0, percentage: 0,
-      births: 0, deaths: 0, tilesControlled: 0, totalTilesConquered: 0
+      births: 0, deaths: 0, tilesControlled: 0, totalTilesConquered: 0,
+      successfulCasts: 0, totalEnergySum: 0, highEnergyCount: 0, recentLosses: 0,
+      moraleIndex: 50, hungerIndex: 50, aggressionIndex: 50
     };
     this.gameStats = {
       totalBirths: 0, totalDeaths: 0, totalSouls: 0,

@@ -127,16 +127,16 @@ export const ClientConfig = {
   // Colors
   COLORS: {
     // Soul casting colors
-    DARK_SOUL_CASTING: 0x8B0000,
+    DARK_SOUL_CASTING: 0x9C27B0,
     LIGHT_SOUL_CASTING: 0xFFD700,
-    DARK_SOUL_PREPARING: 0xFF6B6B,
+    DARK_SOUL_PREPARING: 0xB855D6,
     LIGHT_SOUL_PREPARING: 0xFFE066,
     
     // Orb colors
     LIGHT_ORB_COLORS: [0xFFD700, 0xE6C200, 0xCCAA00, 0xB39200],
-    DARK_ORB_COLORS: [0x8B0000, 0x7A0000, 0x690000, 0x580000],
+    DARK_ORB_COLORS: [0x9C27B0, 0x8A23A0, 0x781F90, 0x661B80],
     LIGHT_ORB_GLOW: 0xFFD700,
-    DARK_ORB_GLOW: 0x8B0000,
+    DARK_ORB_GLOW: 0x9C27B0,
     
     // Attack effects
     ATTACK_PROJECTILE: [0xFF0000, 0xDD0000, 0xBB0000, 0x990000],
@@ -203,6 +203,6 @@ export const ClientConfig = {
     DAWN_BACKGROUND_TINT: 0xFFCC88,   // Orange tint for dawn
     DUSK_BACKGROUND_TINT: 0xFF8844,   // Deeper orange for dusk
     
-    TRANSITION_SPEED: 0.02,     // How fast visual transitions occur
+    TRANSITION_SPEED: 0.1,     // How fast visual transitions occur
   }
 };

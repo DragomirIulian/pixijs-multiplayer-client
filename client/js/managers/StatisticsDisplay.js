@@ -36,6 +36,11 @@ class StatisticsDisplay {
     document.getElementById('light-births').textContent = light.births;
     document.getElementById('light-deaths').textContent = light.deaths;
     document.getElementById('light-territory').textContent = light.tilesControlled;
+    
+    // Update Light team feeling indices
+    document.getElementById('light-morale').textContent = light.moraleIndex || 50;
+    document.getElementById('light-hunger').textContent = light.hungerIndex || 50;
+    document.getElementById('light-aggression').textContent = light.aggressionIndex || 50;
 
     // Update Dark team stats
     document.getElementById('dark-population').textContent = dark.totalSouls;
@@ -44,6 +49,11 @@ class StatisticsDisplay {
     document.getElementById('dark-births').textContent = dark.births;
     document.getElementById('dark-deaths').textContent = dark.deaths;
     document.getElementById('dark-territory').textContent = dark.tilesControlled;
+    
+    // Update Dark team feeling indices
+    document.getElementById('dark-morale').textContent = dark.moraleIndex || 50;
+    document.getElementById('dark-hunger').textContent = dark.hungerIndex || 50;
+    document.getElementById('dark-aggression').textContent = dark.aggressionIndex || 50;
   }
 
   /**

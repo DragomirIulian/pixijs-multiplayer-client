@@ -253,12 +253,12 @@ export class DayNightManager {
       }
     }
     
-    // Add subtle floating animation to sun/moon
-    if (this.sunSprite && this.sunSprite.visible) {
-      this.sunSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y + Math.sin(time.elapsedMS * 0.001) * 3;
+    // Keep sun/moon sprites in fixed positions (no animation)
+    if (this.sunSprite) {
+      this.sunSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
     }
-    if (this.moonSprite && this.moonSprite.visible) {
-      this.moonSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y + Math.sin(time.elapsedMS * 0.001) * 3;
+    if (this.moonSprite) {
+      this.moonSprite.y = ClientConfig.DAY_NIGHT.SUN_MOON_POSITION_Y;
     }
   }
 

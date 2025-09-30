@@ -72,6 +72,8 @@ class SpellSystem {
         completionEvents.push({
           type: 'spell_completed',
           spellId: spell.spellId,
+          casterId: spell.casterId,
+          casterType: spell.casterType,
           tileX: spell.targetTile.x,
           tileY: spell.targetTile.y,
           newTileType: newTileType,
