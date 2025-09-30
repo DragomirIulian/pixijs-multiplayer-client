@@ -162,7 +162,9 @@ const GameConfig = {
     ENERGY_RECOVERY: 50,        // Same as energy orb value (configurable)
     COOLDOWN: 60000,            // 1 minute cooldown between sleep cycles
     MIN_ENERGY_TO_SLEEP: 0,     // 0% energy minimum to initiate sleep
-    MAX_ENERGY_TO_SLEEP: 0.5    // 70% energy maximum to initiate sleep (low priority)
+    MAX_ENERGY_TO_SLEEP: 0.5,   // 50% energy maximum to initiate sleep (low priority)
+    AREA_RADIUS_MULTIPLIER: 3, // Sleep area radius as multiplier of nexus spawn range
+    TARGET_DISTANCE_THRESHOLD: 30 // Distance threshold to consider sleep target reached
   },
 
   // Day/Night cycle configuration

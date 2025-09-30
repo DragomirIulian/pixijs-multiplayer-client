@@ -43,6 +43,7 @@ class MovementSystem {
       SoulStates.HUNGRY, 
       SoulStates.SEEKING,
       SoulStates.SEEKING_NEXUS,
+      SoulStates.SEEKING_SLEEP,  // Moving toward friendly nexus to sleep
       SoulStates.DEFENDING  // Moving toward enemy to attack
       // ATTACKING state not included - souls should stop moving when attacking
     ];
@@ -92,6 +93,12 @@ class MovementSystem {
       case SoulStates.SEEKING_NEXUS:
         moveTarget = this.getNexusTarget(soul);
         movementType = 'seek_nexus';
+        break;
+
+      case SoulStates.SEEKING_SLEEP:
+        // Use the soul's specific sleep target if it has one, otherwise use nexus
+        moveTarget = soul.stateMachine.sleepTarget || this.getFriendlyNexusTarget(soul);
+        movementType = 'seek_sleep';
         break;
 
       case SoulStates.ATTACKING_NEXUS:
@@ -939,6 +946,21 @@ class MovementSystem {
         (Math.random() - 0.5) * 0.5
       );
     }
+  }
+
+  /**
+   * Get friendly nexus position as movement target
+   */
+  getFriendlyNexusTarget(soul) {
+    if (!this.tileMap) return null;
+    
+    const friendlyNexusPos = soul.type === GameConfig.SOUL_TYPES.DARK ? 
+      GameConfig.NEXUS.DARK_NEXUS : GameConfig.NEXUS.LIGHT_NEXUS;
+    
+    const nexusWorldX = friendlyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2);
+    const nexusWorldY = friendlyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2);
+    
+    return { x: nexusWorldX, y: nexusWorldY };
   }
 
   /**

@@ -18,6 +18,7 @@ const SoulStates = {
   SOCIALISING: 'socialising',
   RESTING: 'resting',
   MATING: 'mating',
+  SEEKING_SLEEP: 'seeking_sleep', // Moving to friendly nexus before sleeping
   SLEEPING: 'sleeping'  // Sleeping during opposite cycle for energy recovery
 };
 
@@ -37,6 +38,7 @@ class SoulStateMachine {
     this.lastCastTime = Date.now() - seekingVariance; // Each soul gets unique variance (subtract so some can cast sooner)
     this.defendingTarget = null;
     this.previousState = null;
+    this.sleepTarget = null; // Target position for sleeping
   }
 
   getCurrentState() {
@@ -124,6 +126,10 @@ class SoulStateMachine {
         this.handleMatingState(energyPercentage, allSouls);
         break;
         
+      case SoulStates.SEEKING_SLEEP:
+        this.handleSeekingSleepState(energyPercentage, allSouls);
+        break;
+        
       case SoulStates.SLEEPING:
         this.handleSleepingState(energyPercentage, allSouls);
         break;
@@ -137,7 +143,8 @@ class SoulStateMachine {
 
     // Check if can sleep during opposite cycle (HIGH priority during opposite cycle)
     if (this.soul.canSleep(this.dayNightSystem)) {
-      this.transitionTo(SoulStates.SLEEPING);
+      // Always go to seeking sleep to get a proper sleep target
+      this.transitionTo(SoulStates.SEEKING_SLEEP);
       return;
     }
 
@@ -202,7 +209,8 @@ class SoulStateMachine {
   handleHungryState(energyPercentage, allSouls) {
     // Check if can sleep during opposite cycle (HIGH priority even when hungry)
     if (this.soul.canSleep(this.dayNightSystem)) {
-      this.transitionTo(SoulStates.SLEEPING);
+      // Always go to seeking sleep to get a proper sleep target
+      this.transitionTo(SoulStates.SEEKING_SLEEP);
       return;
     }
 
@@ -412,6 +420,39 @@ class SoulStateMachine {
     // Continue sleeping (no other transitions allowed)
   }
 
+  handleSeekingSleepState(energyPercentage, allSouls) {
+    // Check if should wake up to defend (highest priority)
+    if (this.shouldBeDefender(allSouls)) {
+      this.sleepTarget = null; // Clear sleep target
+      this.transitionTo(SoulStates.DEFENDING);
+      return;
+    }
+
+    // Check if cycle ended (no longer opposite cycle)
+    if (!this.soul.isOppositeCycle(this.dayNightSystem)) {
+      // Cycle ended, go back to roaming
+      this.sleepTarget = null; // Clear sleep target
+      this.transitionTo(SoulStates.ROAMING);
+      return;
+    }
+
+    // Check if we've reached the sleep target area
+    if (this.sleepTarget && this.soul.getDistanceTo(this.sleepTarget) <= GameConfig.SLEEP.TARGET_DISTANCE_THRESHOLD) {
+      // Close enough to sleep target, start sleeping
+      this.transitionTo(SoulStates.SLEEPING);
+      return;
+    }
+
+    // Continue seeking sleep target (MovementSystem will handle movement)
+    // Timeout after reasonable time to prevent getting stuck
+    const timeInState = Date.now() - this.stateStartTime;
+    if (timeInState > GameConfig.SOUL.SEEKING_TIMEOUT) {
+      // Sleep where we are if taking too long to reach target
+      this.transitionTo(SoulStates.SLEEPING);
+      return;
+    }
+  }
+
   isCloseEnoughToAttackEnemy() {
     if (!this.soul.castingEnemyId) return false;
     
@@ -542,6 +583,13 @@ class SoulStateMachine {
         this.soul.isResting = false;
         break;
         
+      case SoulStates.SEEKING_SLEEP:
+        // Set sleep target when first entering this state
+        if (this.previousState !== SoulStates.SEEKING_SLEEP) {
+          this.sleepTarget = this.getRandomSleepPosition();
+        }
+        break;
+
       case SoulStates.SLEEPING:
         // Start sleeping when transitioning to this state
         if (this.previousState !== SoulStates.SLEEPING) {
@@ -550,6 +598,7 @@ class SoulStateMachine {
         this.soul.isResting = true;
         this.soul.isMating = false;
         this.soul.isDefending = false;
+        this.sleepTarget = null; // Clear sleep target once sleeping
         break;
         
       default:
@@ -796,6 +845,37 @@ class SoulStateMachine {
     
     return false; // No valid targets in range
   }
+
+  /**
+   * Get friendly nexus position for this soul
+   */
+  getFriendlyNexusPosition() {
+    if (!this.tileMap) return null;
+    
+    const friendlyNexusPos = this.soul.type === GameConfig.SOUL_TYPES.DARK ? 
+      GameConfig.NEXUS.DARK_NEXUS : GameConfig.NEXUS.LIGHT_NEXUS;
+    
+    return {
+      x: friendlyNexusPos.TILE_X * this.tileMap.tileWidth + (this.tileMap.tileWidth / 2),
+      y: friendlyNexusPos.TILE_Y * this.tileMap.tileHeight + (this.tileMap.tileHeight / 2)
+    };
+  }
+
+  /**
+   * Get a random sleep position near the friendly nexus
+   */
+  getRandomSleepPosition() {
+    const nexusPos = this.getFriendlyNexusPosition();
+    if (!nexusPos) return null;
+    
+    // Add randomness around the nexus so souls don't all sleep in the same spot
+    const sleepRadius = GameConfig.NEXUS.SPAWN_OFFSET_RANGE * GameConfig.SLEEP.AREA_RADIUS_MULTIPLIER;
+    const randomX = nexusPos.x + (Math.random() - 0.5) * sleepRadius * 2;
+    const randomY = nexusPos.y + (Math.random() - 0.5) * sleepRadius * 2;
+    
+    return { x: randomX, y: randomY };
+  }
+
 
   /**
    * Check if there are ANY valid casting targets with score > 0 anywhere on the map
