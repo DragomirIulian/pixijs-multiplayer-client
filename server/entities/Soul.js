@@ -61,8 +61,8 @@ class Soul {
     this.stateMachine = new SoulStateMachine(this, tileMap, movementSystem, spellSystem, dayNightSystem);
   }
 
-  update(allSouls) {
-    this.stateMachine.update(allSouls);
+  update(allSouls, activeDisaster = null) {
+    this.stateMachine.update(allSouls, activeDisaster);
     this.updateEnergy();
     this.updateRetreat();
     this.updateSleepCycle(this.stateMachine.dayNightSystem);

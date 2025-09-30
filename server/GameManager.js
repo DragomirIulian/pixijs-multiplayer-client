@@ -274,9 +274,10 @@ class GameManager {
       nexus.update();
     });
 
-    // Update all souls
+    // Update all souls (pass disaster info)
+    const activeDisaster = this.disasterEventSystem.getActiveDisaster();
     this.souls.forEach(soul => {
-      soul.update(this.souls);
+      soul.update(this.souls, activeDisaster);
      // soul.updateFallbackCasting(); // Track seeking time for fallback casting
     });
 
@@ -313,7 +314,7 @@ class GameManager {
     this.gameEvents.push(...spellCompletionEvents);
 
     // Process mating system (reproduction, child maturation)
-    const matingEvents = this.matingSystem.update(this.souls);
+    const matingEvents = this.matingSystem.update(this.souls, activeDisaster);
     this.gameEvents.push(...matingEvents);
 
     // Process energy orb collection (with day/night energy modifier)

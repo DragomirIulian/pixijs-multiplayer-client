@@ -57,9 +57,16 @@ class SoulStateMachine {
     this.dayNightSystem = dayNightSystem;
   }
 
-  update(allSouls = new Map()) {
+  update(allSouls = new Map(), activeDisaster = null) {
+    // During disasters, force souls to only roam (no other actions allowed)
+    if (activeDisaster && this.currentState !== SoulStates.ROAMING) {
+      console.log(`[Soul ${this.soul.id}] Disaster active - forcing to roaming state from ${this.currentState}`);
+      this.transitionTo(SoulStates.ROAMING);
+      return; // Skip normal state processing during disasters
+    }
+    
     this.checkStateTimeouts();
-    this.processStateTransitions(allSouls);
+    this.processStateTransitions(allSouls, activeDisaster);
   }
 
   checkStateTimeouts() {
@@ -72,12 +79,12 @@ class SoulStateMachine {
     }
   }
 
-  processStateTransitions(allSouls) {
+  processStateTransitions(allSouls, activeDisaster = null) {
     const energyPercentage = this.soul.energy / this.soul.maxEnergy;
     
     switch (this.currentState) {
       case SoulStates.ROAMING:
-        this.handleRoamingState(energyPercentage, allSouls);
+        this.handleRoamingState(energyPercentage, allSouls, activeDisaster);
         break;
         
       case SoulStates.HUNGRY:
@@ -136,9 +143,14 @@ class SoulStateMachine {
     }
   }
 
-  handleRoamingState(energyPercentage, allSouls) {
+  handleRoamingState(energyPercentage, allSouls, activeDisaster = null) {
     if (this.soul.isChild) {
         return;
+    }
+
+    // During disasters, souls can only roam - no other actions allowed
+    if (activeDisaster) {
+      return; // Stay in roaming state, no transitions allowed
     }
 
     // Check if can sleep during opposite cycle (HIGH priority during opposite cycle)

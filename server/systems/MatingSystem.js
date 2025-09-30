@@ -12,11 +12,17 @@ class MatingSystem {
     this.matingEvents = [];
   }
 
-  update(allSouls) {
+  update(allSouls, activeDisaster = null) {
     this.matingEvents = [];
     
-    // Process child maturation
+    // Process child maturation (always allowed)
     this.processChildMaturation(allSouls);
+    
+    // During disasters, no new mating is allowed and existing mating is cancelled
+    if (activeDisaster) {
+      this.cancelAllMatingDuringDisaster(allSouls);
+      return this.matingEvents;
+    }
     
     // Only check for new mating pairs every 3 seconds to reduce frequency
     if (!this.lastMatingCheck || Date.now() - this.lastMatingCheck > 3000) {
@@ -28,6 +34,41 @@ class MatingSystem {
     this.processCompletedMating(allSouls);
     
     return this.matingEvents;
+  }
+
+  /**
+   * Cancel all active mating during disasters
+   */
+  cancelAllMatingDuringDisaster(allSouls) {
+    allSouls.forEach(soul => {
+      if (soul.isMating && soul.matingPartner) {
+        // Cancel mating for both souls
+        const partner = soul.matingPartner;
+        
+        // Clear mating state
+        soul.isMating = false;
+        soul.matingPartner = null;
+        soul.matingStartTime = null;
+        soul.readyToCompleteMating = false;
+        
+        if (partner) {
+          partner.isMating = false;
+          partner.matingPartner = null;
+          partner.matingStartTime = null;
+          partner.readyToCompleteMating = false;
+        }
+        
+        // Broadcast mating cancelled event
+        this.matingEvents.push({
+          type: 'mating_cancelled',
+          soul1Id: soul.id,
+          soul2Id: partner ? partner.id : null,
+          reason: 'disaster'
+        });
+        
+        console.log(`[Disaster] Cancelled mating between ${soul.id} and ${partner ? partner.id : 'unknown'}`);
+      }
+    });
   }
 
   processChildMaturation(allSouls) {

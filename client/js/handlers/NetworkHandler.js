@@ -176,11 +176,16 @@ export class NetworkHandler {
         
         // Update active disaster state
         if (this.disasterEffectsManager) {
-            if (activeDisaster && !this.disasterEffectsManager.isDisasterActive()) {
-                // Start disaster if one is active on server but not on client
-                this.disasterEffectsManager.startDisaster(activeDisaster.type, activeDisaster.duration);
+            if (activeDisaster && activeDisaster.type === 'freezing_snow') {
+                // Restore snowing effect if disaster is active
+                if (!this.disasterEffectsManager.isDisasterActive()) {
+                    const remainingDuration = activeDisaster.duration - (Date.now() - activeDisaster.startTime);
+                    if (remainingDuration > 0) {
+                        this.disasterEffectsManager.startDisaster(activeDisaster.type, remainingDuration);
+                    }
+                }
             } else if (!activeDisaster && this.disasterEffectsManager.isDisasterActive()) {
-                // End disaster if server has no active disaster but client does
+                // End disaster if no active disaster on server
                 this.disasterEffectsManager.endDisaster();
             }
         }

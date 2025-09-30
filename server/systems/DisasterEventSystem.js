@@ -104,23 +104,43 @@ class DisasterEventSystem {
     
     if (!this.activeDisaster) return events;
 
-    // Only apply effects once at the start of the disaster
-    if (!this.activeDisaster.effectsApplied) {
-      this.activeDisaster.effectsApplied = true;
+    const now = Date.now();
+    const elapsed = now - this.activeDisaster.startTime;
+    const progress = elapsed / this.activeDisaster.duration; // 0 to 1
 
-      const soulsArray = Array.from(souls.values()).filter(soul => !soul.isDead);
-      const deathCount = Math.floor(soulsArray.length * this.activeDisaster.deathPercentage);
+    // Initialize disaster tracking on first call
+    if (!this.activeDisaster.effectsInitialized) {
+      this.activeDisaster.effectsInitialized = true;
+      this.activeDisaster.totalSoulsAtStart = Array.from(souls.values()).filter(soul => !soul.isDead).length;
+      this.activeDisaster.soulsKilledSoFar = 0;
+      this.activeDisaster.lastKillTime = now;
+      
+      console.log(`[Disaster] Freezing Snow started - ${this.activeDisaster.totalSoulsAtStart} souls at risk`);
+    }
 
-      // Randomly select souls to die
-      const shuffled = soulsArray.sort(() => Math.random() - 0.5);
-      const victimsToKill = shuffled.slice(0, deathCount);
+    // Calculate how many souls should be dead by now based on progress
+    const targetDeaths = Math.floor(this.activeDisaster.totalSoulsAtStart * this.activeDisaster.deathPercentage * progress);
+    const soulsToKillNow = targetDeaths - this.activeDisaster.soulsKilledSoFar;
 
-      // Just mark them as dead - let handleSoulDeaths() handle the death animation
-      victimsToKill.forEach(soul => {
-        soul.isDead = true;
-      });
+    // Kill souls gradually (but not too frequently)
+    if (soulsToKillNow > 0 && (now - this.activeDisaster.lastKillTime) >= 2000) { // Kill every 2 seconds max
+      const aliveSouls = Array.from(souls.values()).filter(soul => !soul.isDead);
+      
+      if (aliveSouls.length > 0) {
+        // Randomly select souls to kill this round
+        const shuffled = aliveSouls.sort(() => Math.random() - 0.5);
+        const victimsToKill = shuffled.slice(0, Math.min(soulsToKillNow, aliveSouls.length));
 
-      console.log(`[Disaster] Freezing Snow killed ${deathCount} souls out of ${soulsArray.length}`);
+        // Mark them as dead
+        victimsToKill.forEach(soul => {
+          soul.isDead = true;
+        });
+
+        this.activeDisaster.soulsKilledSoFar += victimsToKill.length;
+        this.activeDisaster.lastKillTime = now;
+
+        console.log(`[Disaster] Freezing Snow killed ${victimsToKill.length} souls (${this.activeDisaster.soulsKilledSoFar} total, ${Math.round(progress * 100)}% through disaster)`);
+      }
     }
 
     return events;

@@ -228,7 +228,7 @@ const GameConfig = {
       TRIGGER_CHANCE: 1,          // 10% chance per check cycle
       DURATION: 10000,              // 1 minute (60 seconds)
       DEATH_PERCENTAGE: 0.3,       // 15% of characters die
-      COOLDOWN: 10000              // 2 minutes cooldown before next event can occur
+      COOLDOWN: 20000              // 2 minutes cooldown before next event can occur
     }
   }
 };
