@@ -626,6 +626,10 @@ class GameManager {
   getActiveDisaster() {
     return this.disasterEventSystem.getActiveDisaster();
   }
+
+  getPermanentCraters() {
+    return this.disasterEventSystem.getPermanentCraters();
+  }
 }
 
 module.exports = GameManager;

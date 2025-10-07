@@ -69,6 +69,7 @@ function broadcastWorldState() {
     borderScores: gameManager.getBorderScores(),
     buffs: gameManager.getBuffs(),
     activeDisaster: gameManager.getActiveDisaster(),
+    permanentCraters: gameManager.getPermanentCraters(),
     config: {
       ui: GameConfig.UI
     }
@@ -90,6 +91,7 @@ wss.on('connection', (ws) => {
     borderScores: gameManager.getBorderScores(),
     buffs: gameManager.getBuffs(),
     activeDisaster: gameManager.getActiveDisaster(),
+    permanentCraters: gameManager.getPermanentCraters(),
     config: {
       ui: GameConfig.UI
     }

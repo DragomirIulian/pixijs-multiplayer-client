@@ -231,6 +231,24 @@ export const ClientConfig = {
       VIGNETTE_ALPHA: 0.2,                // Darkness around edges
       FADE_IN_DURATION: 2000,             // Fade-in transition duration (ms)
       FADE_OUT_DURATION: 2000             // Fade-out transition duration (ms)
+    },
+    
+    // Meteorite Storm Effect
+    METEORITE_STORM: {
+      METEORITE_SCALE: 0.3,
+      METEORITE_SPEED: 8,
+      METEORITE_ALPHA: 0.9,
+      CRATER_SCALE: 0.2,
+      CRATER_ALPHA: 1.0,
+      CRATER_Z_INDEX: 500,
+      RED_TINT: 0xFF6644,
+      RED_TINT_INTENSITY: 0.4,
+      SCREEN_SHAKE_INTENSITY: 12,
+      SCREEN_SHAKE_DURATION: 800,
+      FADE_IN_DURATION: 1500,
+      FADE_OUT_DURATION: 2500,
+      IMPACT_DETECTION_DISTANCE: 30,
+      TARGET_OFFSET_THRESHOLD: 10
     }
   }
 };

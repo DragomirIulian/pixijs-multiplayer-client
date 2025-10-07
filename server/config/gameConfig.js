@@ -225,10 +225,25 @@ const GameConfig = {
     // Freezing Snow Event
     FREEZING_SNOW: {
       ENABLED: true,
+      TRIGGER_CHANCE: 0,          // 10% chance per check cycle
+      DURATION: 10000,              // 10 seconds
+      DEATH_PERCENTAGE: 0.3,       // 30% of characters die
+      COOLDOWN: 20000              // 20 seconds cooldown before next event can occur
+    },
+    
+    // Meteorite Storm Event
+    METEORITE_STORM: {
+      ENABLED: true,
       TRIGGER_CHANCE: 1,          // 10% chance per check cycle
-      DURATION: 10000,              // 1 minute (60 seconds)
-      DEATH_PERCENTAGE: 0.3,       // 15% of characters die
-      COOLDOWN: 20000              // 2 minutes cooldown before next event can occur
+      DURATION: 5000,              // 15 seconds
+      DEATH_PERCENTAGE: 0.4,        // 40% of characters die (more deadly than snow)
+      COOLDOWN: 5000,              // 25 seconds cooldown before next event can occur
+      IMPACT_WAVES: 3,              // Number of impact waves during the storm
+      WAVE_INTERVAL: 1000,          // Time between impact waves (ms)
+      METEORITE_SPEED: 8,           // Speed of meteorites (must match client)
+      IMPACT_DETECTION_DISTANCE: 30, // Distance threshold for impact detection
+      TARGET_OFFSET_THRESHOLD: 10,   // Y-offset threshold for impact detection
+      FRAME_TIME: 16.67             // 60fps assumption for calculations
     }
   }
 };

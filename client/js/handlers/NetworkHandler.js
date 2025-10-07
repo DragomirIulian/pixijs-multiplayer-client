@@ -36,7 +36,7 @@ export class NetworkHandler {
                 }, ClientConfig.ANIMATION.CHARACTER_REMOVE_DELAY);
                 break;
             case 'world_state':
-                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores, data.buffs, data.activeDisaster, data.config);
+                this.updateWorldState(data.characters, data.energyOrbs, data.nexuses, data.tileMap, data.activeSpells, data.dayNightState, data.statistics, data.borderScores, data.buffs, data.activeDisaster, data.permanentCraters, data.config);
                 break;
             case 'buff_applied':
                 if (this.buffDisplay) {
@@ -122,7 +122,7 @@ export class NetworkHandler {
             case 'disaster_start':
                 // Handle disaster start event
                 if (this.disasterEffectsManager) {
-                    this.disasterEffectsManager.startDisaster(data.disasterType, data.duration);
+                    this.disasterEffectsManager.startDisaster(data.disasterType, data.duration, data);
                 }
                 console.log(`[Disaster] ${data.disasterType} started!`);
                 break;
@@ -133,6 +133,13 @@ export class NetworkHandler {
                 }
                 console.log(`[Disaster] ${data.disasterType} ended!`);
                 break;
+            case 'meteorite_impact':
+                // Create crater when server says impact happened
+                if (this.disasterEffectsManager) {
+                    this.disasterEffectsManager.handleMeteoriteImpact(data.crater);
+                }
+                console.log(`[Disaster] Server crater created at (${Math.round(data.crater.x)}, ${Math.round(data.crater.y)})`);
+                break;
         }
     }
 
@@ -142,7 +149,7 @@ export class NetworkHandler {
         this.spellManager.clearAllSpells();
     }
 
-    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores, buffs, activeDisaster, config) {
+    updateWorldState(charactersData, energyOrbsData, nexusesData, tileMapData, activeSpellsData, dayNightState, statistics, borderScores, buffs, activeDisaster, permanentCraters, config) {
         // Smart update - only change what's different to prevent visual glitches
         this.updateCharactersSmartly(charactersData);
         this.updateEnergyOrbsSmartly(energyOrbsData);
@@ -176,8 +183,8 @@ export class NetworkHandler {
         
         // Update active disaster state
         if (this.disasterEffectsManager) {
-            if (activeDisaster && activeDisaster.type === 'freezing_snow') {
-                // Restore snowing effect if disaster is active
+            if (activeDisaster && (activeDisaster.type === 'freezing_snow' || activeDisaster.type === 'meteorite_storm')) {
+                // Restore disaster effect if disaster is active
                 if (!this.disasterEffectsManager.isDisasterActive()) {
                     const remainingDuration = activeDisaster.duration - (Date.now() - activeDisaster.startTime);
                     if (remainingDuration > 0) {
@@ -188,6 +195,12 @@ export class NetworkHandler {
                 // End disaster if no active disaster on server
                 this.disasterEffectsManager.endDisaster();
             }
+        }
+        
+        // Update permanent craters
+        if (permanentCraters && this.disasterEffectsManager) {
+            console.log(`[DEBUG] Received ${permanentCraters.length} permanent craters from server:`, permanentCraters);
+            this.disasterEffectsManager.updatePermanentCraters(permanentCraters);
         }
         
         // Update statistics
