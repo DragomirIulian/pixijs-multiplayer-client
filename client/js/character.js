@@ -2,9 +2,10 @@ import { Assets, Sprite, Graphics, Container } from 'https://unpkg.com/pixi.js@8
 import { ClientConfig } from './config/clientConfig.js';
 
 export class Character {
-    constructor(app, characterData, dayNightManager = null) {
+    constructor(app, characterData, dayNightManager = null, disasterEffectsManager = null) {
         this.app = app;
         this.dayNightManager = dayNightManager;
+        this.disasterEffectsManager = disasterEffectsManager;
         this.id = characterData.id;
         this.name = characterData.name;
         this.type = characterData.type;
@@ -433,6 +434,13 @@ export class Character {
         // Check for combat states OR combat cooldown - use existing soul images
         else if (this.isCombatState(this.currentState) || this.isInCombatCooldown()) {
             return `./resources/${this.type}.png`;
+        }
+        // Check for freezing snow disaster - only affects white kryons
+        else if (this.disasterEffectsManager && 
+                 this.disasterEffectsManager.isDisasterActive() && 
+                 this.disasterEffectsManager.getCurrentDisasterType() === 'freezing_snow' &&
+                 teamColor === 'white') {
+            return `./resources/kryons/frozen_white_kryon.png`;
         }
         // Check for happy state (after eating/mating)
         else if (this.happyStateEndTime > 0 && Date.now() < this.happyStateEndTime) {

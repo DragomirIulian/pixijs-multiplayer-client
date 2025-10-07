@@ -6,15 +6,16 @@ import { ClientConfig } from '../config/clientConfig.js';
  * Handles spawning, updating, removing characters
  */
 export class CharacterManager {
-    constructor(app, characterCard, dayNightManager = null) {
+    constructor(app, characterCard, dayNightManager = null, disasterEffectsManager = null) {
         this.app = app;
         this.characterCard = characterCard;
         this.dayNightManager = dayNightManager;
+        this.disasterEffectsManager = disasterEffectsManager;
         this.characters = new Map();
     }
 
     async spawnCharacter(characterData) {
-        const character = new Character(this.app, characterData, this.dayNightManager);
+        const character = new Character(this.app, characterData, this.dayNightManager, this.disasterEffectsManager);
         await character.init();
         
         // Add shadow sprite to stage first (behind character)

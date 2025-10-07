@@ -98,8 +98,11 @@ export class Game {
         // Initialize buff display manager
         this.buffDisplay = new BuffDisplay(this.app);
         
+        // Initialize disaster effects manager first
+        this.disasterEffectsManager = new DisasterEffectsManager(this.app);
+        
         // Initialize managers with focused responsibilities
-        this.characterManager = new CharacterManager(this.app, this.characterCard, this.dayNightManager);
+        this.characterManager = new CharacterManager(this.app, this.characterCard, this.dayNightManager, this.disasterEffectsManager);
         this.energyOrbManager = new EnergyOrbManager(this.app);
         this.spellManager = new SpellManager(this.app);
         
@@ -109,9 +112,6 @@ export class Game {
         
         // Initialize statistics display
         this.statisticsDisplay = new StatisticsDisplay();
-        
-        // Initialize disaster effects manager
-        this.disasterEffectsManager = new DisasterEffectsManager(this.app);
         
         // Make statisticsDisplay available globally for HTML button
         window.statsDisplay = this.statisticsDisplay;
